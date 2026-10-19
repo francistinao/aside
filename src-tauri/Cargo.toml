@@ -24,6 +24,8 @@ thiserror = "2"
 pulldown-cmark = { version = "0.13", default-features = false }
 # UAX 29 word boundaries and grapheme counts, so Korean and other scripts work.
 unicode-segmentation = "1.13"
+# settings.json in the app config dir, as docs/ARCHITECTURE.md specifies.
+tauri-plugin-store = "2.5"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # NSPanel conversion so the bubble shows over other apps' full screen Spaces.

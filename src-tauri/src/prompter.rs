@@ -3,13 +3,14 @@
 
 use std::sync::Mutex;
 
-use tauri::{AppHandle, Emitter, Manager, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, LogicalSize, Manager, WebviewWindow, WebviewWindowBuilder};
 
 use crate::capture::{self, CaptureStatus};
 use crate::error::{Error, Result};
 use crate::follow::placement::{Corner, Size};
 use crate::follow::{self, FollowConfig, FollowHandle, FollowStats};
 use crate::lock::lock;
+use crate::settings::SettingsState;
 
 pub const LABEL: &str = "prompter";
 pub const LIBRARY: &str = "library";
@@ -47,11 +48,8 @@ pub fn set_visible(app: &AppHandle, visible: bool) -> Result<CaptureStatus> {
     };
     if visible {
         show(app, &window)?;
-        let status = capture::apply(&window, true);
-        *lock(&state.capture) = status;
-        for label in CAPTURE_LISTENERS {
-            let _ = app.emit_to(label, CAPTURE_EVENT, status);
-        }
+        let hide = app.state::<SettingsState>().get().hide_from_capture;
+        let status = apply_capture(app, &state, &window, hide);
         if let Some(follow) = lock(&state.follow).as_ref() {
             follow.set_active(true);
         }
@@ -62,6 +60,42 @@ pub fn set_visible(app: &AppHandle, visible: bool) -> Result<CaptureStatus> {
         }
         hide(app, &window)?;
         Ok(state.capture_status())
+    }
+}
+
+/// Turns capture exclusion on or off for an existing bubble and reports the result.
+pub fn set_capture(app: &AppHandle, enabled: bool) -> Result<CaptureStatus> {
+    let state = app.state::<Prompter>();
+    match app.get_webview_window(LABEL) {
+        Some(window) => Ok(apply_capture(app, &state, &window, enabled)),
+        None => Ok(state.capture_status()),
+    }
+}
+
+fn apply_capture(app: &AppHandle, state: &Prompter, window: &WebviewWindow, enabled: bool) -> CaptureStatus {
+    let status = capture::apply(window, enabled);
+    *lock(&state.capture) = status;
+    for label in CAPTURE_LISTENERS {
+        let _ = app.emit_to(label, CAPTURE_EVENT, status);
+    }
+    status
+}
+
+/// Resizes the window to the overlay's layout. The follow loop places the new size.
+pub fn resize(app: &AppHandle, width: f64, height: f64) -> Result<()> {
+    let state = app.state::<Prompter>();
+    if let Some(window) = app.get_webview_window(LABEL) {
+        window.set_size(LogicalSize::new(width, height))?;
+    }
+    if let Some(follow) = lock(&state.follow).as_ref() {
+        follow.set_bubble(Size { w: width, h: height });
+    }
+    Ok(())
+}
+
+pub fn set_corner(app: &AppHandle, corner: Corner) {
+    if let Some(follow) = lock(&app.state::<Prompter>().follow).as_ref() {
+        follow.set_corner(corner);
     }
 }
 
@@ -81,7 +115,8 @@ fn create(app: &AppHandle, state: &Prompter) -> Result<WebviewWindow> {
         w: config.width,
         h: config.height,
     };
-    let handle = follow::spawn(app, &window, FollowConfig::default(), Corner::BottomRight, bubble)?;
+    let corner = app.state::<SettingsState>().get().corner;
+    let handle = follow::spawn(app, &window, FollowConfig::default(), corner, bubble)?;
     *lock(&state.follow) = Some(handle);
     Ok(window)
 }

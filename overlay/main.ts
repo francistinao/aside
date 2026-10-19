@@ -79,4 +79,4 @@ const root = document.getElementById('root') ?? document.body;
 const view = build(root);
 
 void listen<CaptureStatus>('capture://status', (event) => view.setStatus(event.payload));
-void listen<{ corner: Corner }>('prompter://style', (event) => view.setCorner(event.payload.corner));
+void listen<{ corner: Corner }>('prompter://corner', (event) => view.setCorner(event.payload.corner));

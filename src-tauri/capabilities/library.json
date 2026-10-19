@@ -8,6 +8,8 @@
     "allow-session-start",
     "allow-session-control",
     "allow-session-estimate",
+    "allow-settings-get",
+    "allow-settings-set",
     "allow-prompter-set-visible",
     "allow-capture-status",
     "allow-follow-stats"

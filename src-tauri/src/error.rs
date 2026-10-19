@@ -8,6 +8,10 @@ pub enum Error {
     Tauri(#[from] tauri::Error),
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error(transparent)]
+    Store(#[from] tauri_plugin_store::Error),
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
     #[error("the main thread is not available")]
     NotMainThread,
     #[error("the {0} window does not exist")]

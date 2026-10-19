@@ -5,8 +5,8 @@ pub mod placement;
 pub mod platform;
 pub mod spring;
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread::{self, Thread};
 use std::time::{Duration, Instant};
 
@@ -18,9 +18,10 @@ use platform::Platform;
 use spring::{cap_speed, clamp_dt, is_settled, spring_step};
 
 use crate::error::Result;
+use crate::lock::lock;
 
 /// Sent to the prompter only when the effective corner changes after an edge flip.
-pub const STYLE_EVENT: &str = "prompter://style";
+pub const CORNER_EVENT: &str = "prompter://corner";
 
 /// The follow feel presets from docs/CURSOR-UX.md.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,15 +108,18 @@ pub struct FollowStats {
 }
 
 #[derive(Clone, Copy, Serialize)]
-struct StylePayload {
+struct CornerPayload {
     corner: Corner,
 }
 
-#[derive(Default)]
 struct Shared {
     active: AtomicBool,
     hz: AtomicU32,
     settled: AtomicBool,
+    /// The corner the user chose. The loop flips away from it at screen edges.
+    corner: Mutex<Corner>,
+    /// Logical window size, kept in step with the overlay's layout.
+    bubble: Mutex<Size>,
 }
 
 /// Controls the follow thread from the main thread.
@@ -139,6 +143,14 @@ impl FollowHandle {
             settled: self.shared.settled.load(Ordering::Relaxed),
         }
     }
+
+    pub fn set_corner(&self, corner: Corner) {
+        *lock(&self.shared.corner) = corner;
+    }
+
+    pub fn set_bubble(&self, bubble: Size) {
+        *lock(&self.shared.bubble) = bubble;
+    }
 }
 
 /// Starts the follow thread for `window`. Call on the main thread. The thread starts parked.
@@ -150,13 +162,19 @@ pub fn spawn(
     bubble: Size,
 ) -> Result<FollowHandle> {
     let platform = Platform::new(app, window)?;
-    let shared = Arc::new(Shared::default());
+    let shared = Arc::new(Shared {
+        active: AtomicBool::new(false),
+        hz: AtomicU32::new(0),
+        settled: AtomicBool::new(false),
+        corner: Mutex::new(corner),
+        bubble: Mutex::new(bubble),
+    });
     let loop_shared = Arc::clone(&shared);
     let loop_app = app.clone();
     let label = window.label().to_string();
     let join = thread::Builder::new()
         .name("follow".into())
-        .spawn(move || run(loop_app, label, platform, loop_shared, config, corner, bubble))?;
+        .spawn(move || run(loop_app, label, platform, loop_shared, config))?;
     Ok(FollowHandle {
         shared,
         thread: join.thread().clone(),
@@ -186,19 +204,12 @@ fn distance(a: Point, b: Point) -> f64 {
     ((a.x - b.x).powi(2) + (a.y - b.y).powi(2)).sqrt()
 }
 
-fn run(
-    app: AppHandle,
-    label: String,
-    mut platform: Platform,
-    shared: Arc<Shared>,
-    config: FollowConfig,
-    corner: Corner,
-    bubble: Size,
-) {
+fn run(app: AppHandle, label: String, mut platform: Platform, shared: Arc<Shared>, config: FollowConfig) {
     let active_period = Duration::from_secs_f64(1.0 / f64::from(config.active_hz));
     let idle_period = Duration::from_secs_f64(1.0 / f64::from(config.idle_hz));
     let mut state = Bubble::default();
     let mut flip = FlipState::default();
+    let mut chosen_corner = *lock(&shared.corner);
     let mut effective_corner = None;
     let mut last_target = Point::default();
     let mut last_move = None;
@@ -225,6 +236,12 @@ fn run(
             thread::sleep(idle_period);
             continue;
         };
+        let corner = *lock(&shared.corner);
+        let bubble = *lock(&shared.bubble);
+        if corner != chosen_corner {
+            chosen_corner = corner;
+            flip = FlipState::default();
+        }
         let scale = sample.unit_scale;
         let params = PlaceParams {
             distance: config.distance * scale,
@@ -238,10 +255,10 @@ fn run(
         let placement = place(sample.pointer, corner, &params, sample.work_area, &mut flip);
         if effective_corner != Some(placement.corner) {
             effective_corner = Some(placement.corner);
-            let payload = StylePayload {
+            let payload = CornerPayload {
                 corner: placement.corner,
             };
-            let _ = app.emit_to(label.as_str(), STYLE_EVENT, payload);
+            let _ = app.emit_to(label.as_str(), CORNER_EVENT, payload);
         }
 
         let target = placement.target;
