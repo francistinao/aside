@@ -15,3 +15,21 @@ export function pickLines(markdown: string, count = 3): string[] {
   }
   return lines.slice(0, count);
 }
+
+// Greedy word wrap against a width test, so each visual line fits the bubble.
+// A word that fits nowhere gets a line of its own rather than vanishing.
+export function breakLines(text: string, fits: (line: string) => boolean): string[] {
+  const lines: string[] = [];
+  let current = '';
+  for (const word of text.split(/\s+/).filter((word) => word !== '')) {
+    const candidate = current === '' ? word : `${current} ${word}`;
+    if (current === '' || fits(candidate)) {
+      current = candidate;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current !== '') lines.push(current);
+  return lines;
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import sample from '../assets/sample-script.md?raw';
-import { pickLines } from './sample';
+import { breakLines, pickLines } from './sample';
 
 describe('pickLines', () => {
   it('takes the first three reading lines from the sample script', () => {
@@ -21,5 +21,22 @@ describe('pickLines', () => {
 
   it('returns fewer lines when the script is short', () => {
     expect(pickLines('Only one line.')).toEqual(['Only one line.']);
+  });
+});
+
+describe('breakLines', () => {
+  const upTo = (max: number) => (line: string) => line.length <= max;
+
+  it('fills each line with as many words as fit', () => {
+    expect(breakLines('one two three four five', upTo(9))).toEqual(['one two', 'three', 'four five']);
+  });
+
+  it('keeps a word that fits nowhere on its own line', () => {
+    expect(breakLines('a extraordinarily b', upTo(5))).toEqual(['a', 'extraordinarily', 'b']);
+  });
+
+  it('collapses whitespace and ignores empty text', () => {
+    expect(breakLines('  spaced   out  ', upTo(20))).toEqual(['spaced out']);
+    expect(breakLines('', upTo(20))).toEqual([]);
   });
 });
