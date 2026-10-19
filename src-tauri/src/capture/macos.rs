@@ -3,9 +3,9 @@
 
 use objc2::MainThreadMarker;
 use objc2::rc::Retained;
-use objc2_app_kit::{NSWindow, NSWindowSharingType};
+use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior, NSWindowSharingType, NSWindowStyleMask};
 use tauri::WebviewWindow;
-use tauri_nspanel::{CollectionBehavior, PanelLevel, WebviewWindowExt};
+use tauri_nspanel::{PanelLevel, WebviewWindowExt};
 
 use super::CaptureStatus;
 use crate::error::{Error, Result};
@@ -27,17 +27,24 @@ mod panel {
     }
 }
 
-/// Converts the prompter window into a panel at Status level that joins every Space and
-/// shows over other apps' full screen Spaces. The window never takes clicks, so it needs no
-/// nonactivating style mask. Content protection is applied again after the class swap.
+/// Converts the prompter window into a panel that shows over other apps' full screen Spaces,
+/// following Apple's recipe for an auxiliary panel (docs/INVISIBILITY.md, "The overlay
+/// panel"). tauri-nspanel can only convert a built window, so the nonactivating mask is added
+/// after the swap through AppKit's public setter; tauri-nspanel's own `set_style_mask` calls
+/// a private selector. Content protection is applied again at the end, because the class
+/// swap and the style mask change both reset it.
 pub fn setup_panel(window: &WebviewWindow) -> Result<()> {
     let panel = window.to_panel::<PrompterPanel>()?;
-    panel.set_level(PanelLevel::Status.value());
+    let ns_panel = panel.as_panel();
+    ns_panel.setStyleMask(ns_panel.styleMask() | NSWindowStyleMask::NonactivatingPanel);
+    panel.set_floating_panel(true);
+    panel.set_hides_on_deactivate(false);
+    panel.set_level(PanelLevel::ScreenSaver.value());
     panel.set_collection_behavior(
-        CollectionBehavior::new()
-            .can_join_all_spaces()
-            .full_screen_auxiliary()
-            .into(),
+        NSWindowCollectionBehavior::CanJoinAllSpaces
+            | NSWindowCollectionBehavior::CanJoinAllApplications
+            | NSWindowCollectionBehavior::FullScreenAuxiliary
+            | NSWindowCollectionBehavior::Stationary,
     );
     panel.set_ignores_mouse_events(true);
     window.set_content_protected(true)?;

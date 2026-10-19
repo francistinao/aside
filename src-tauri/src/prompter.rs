@@ -46,6 +46,8 @@ pub fn set_visible(app: &AppHandle, visible: bool) -> Result<CaptureStatus> {
         Some(window) => window,
         None => create(app, &state)?,
     };
+    #[cfg(windows)]
+    crate::topmost::set_visible(visible);
     if visible {
         show(app, &window)?;
         let hide = app.state::<SettingsState>().get().hide_from_capture;
@@ -111,6 +113,8 @@ fn create(app: &AppHandle, state: &Prompter) -> Result<WebviewWindow> {
     window.set_ignore_cursor_events(true)?;
     #[cfg(target_os = "macos")]
     capture::macos::setup_panel(&window)?;
+    #[cfg(windows)]
+    crate::topmost::install(window.hwnd()?);
     let bubble = Size {
         w: config.width,
         h: config.height,

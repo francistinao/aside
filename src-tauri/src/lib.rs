@@ -6,6 +6,8 @@ pub mod menu;
 pub mod prompter;
 pub mod session;
 pub mod settings;
+#[cfg(windows)]
+pub mod topmost;
 pub mod vault;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -109,6 +111,11 @@ fn session_start(
 
 /// Shows the bubble and hands the script to the session thread. Main thread only.
 fn begin_session(app: &AppHandle, payload: ScriptPayload) -> error::Result<()> {
+    // Accessory while a session runs: no Dock icon or app menu, so ordering the panel front
+    // never activates Aside and pushes a full screen app out of its Space. Regular on Stop.
+    // Once per start and stop, never per focus change. See docs/INVISIBILITY.md.
+    #[cfg(target_os = "macos")]
+    app.set_activation_policy(tauri::ActivationPolicy::Accessory)?;
     prompter::set_visible(app, true)?;
     app.state::<SessionHandle>().send(Control::Start(payload));
     Ok(())
@@ -127,6 +134,8 @@ fn session_control(
 ) -> error::Result<()> {
     if matches!(action, Action::Stop) {
         prompter::set_visible(&app, false)?;
+        #[cfg(target_os = "macos")]
+        app.set_activation_policy(tauri::ActivationPolicy::Regular)?;
     }
     session.send(Control::Act(action));
     Ok(())
@@ -440,6 +449,8 @@ pub fn run() {
                     let _ = window.set_focus();
                 }
             }
+            #[cfg(windows)]
+            RunEvent::Exit => topmost::remove(),
             _ => {}
         });
 }

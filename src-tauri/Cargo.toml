@@ -51,8 +51,8 @@ objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSEvent", "NSGr
 objc2-foundation = { version = "0.3", features = ["NSGeometry"] }
 
 [target.'cfg(windows)'.dependencies]
-# Cursor, monitor, DPI and display affinity calls. Same version as tauri and tao.
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging"] }
+# Cursor, monitor, DPI, display affinity and the foreground hook. Same version as tauri and tao.
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_Accessibility", "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging"] }
 # Build number through RtlGetVersion. Already in tao's dependency tree.
 windows-version = "0.1"
 
