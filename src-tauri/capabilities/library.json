@@ -15,6 +15,7 @@
     "allow-vault-search",
     "allow-library-pin",
     "allow-library-context-menu",
+    "allow-platform-info",
     "allow-vault-read",
     "allow-vault-write",
     "allow-vault-create",

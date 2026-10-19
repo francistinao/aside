@@ -1,0 +1,12 @@
+/* The Library window's chrome. On macOS the body is transparent so the sidebar shows the
+   window's vibrancy. Everywhere else the main column paints its own opaque background. */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+.platform-macos body {
+  background: transparent;
+}

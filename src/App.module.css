@@ -1,4 +1,47 @@
-.app {
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   height: 100%;
+  overflow: hidden;
+}
+
+/* Vibrancy on macOS, Mica on Windows 11, opaque on Windows 10. */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--sidebar-tint);
+}
+
+:global([data-backdrop="no"]) .sidebar {
+  background: var(--bg-window);
+}
+
+/* Room for the traffic lights on macOS; the native title bar covers it on Windows. */
+.sidebarTop {
+  flex: none;
+  height: var(--toolbar-height);
+}
+
+:global(.platform-windows) .sidebarTop {
+  height: var(--gap-12);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg-window);
+}
+
+.toolbar {
+  flex: none;
+  height: var(--toolbar-height);
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
 }

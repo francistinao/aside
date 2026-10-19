@@ -19,6 +19,33 @@ use settings::{Settings, SettingsPatch, SettingsState};
 use vault::index::Hit;
 use vault::{ChosenFolder, FileData, Tree, Vault, VaultStatus};
 
+/// What the Library needs to know about the platform before it paints.
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformInfo {
+    pub os: &'static str,
+    /// True when the window has a real backdrop: vibrancy on macOS, Mica on Windows 11.
+    pub backdrop: bool,
+}
+
+#[tauri::command]
+fn platform_info() -> PlatformInfo {
+    #[cfg(target_os = "macos")]
+    {
+        PlatformInfo {
+            os: "macos",
+            backdrop: true,
+        }
+    }
+    #[cfg(windows)]
+    {
+        PlatformInfo {
+            os: "windows",
+            backdrop: windows_version::OsVersion::current().build >= 22000,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionInfo {
@@ -203,7 +230,12 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_opener::init());
+        .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_denylist(&[prompter::LABEL])
+                .build(),
+        );
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
     #[cfg(debug_assertions)]
@@ -219,6 +251,7 @@ pub fn run() {
         vault_search,
         library_pin,
         library_context_menu,
+        platform_info,
         vault_read,
         vault_write,
         vault_create,
@@ -244,6 +277,7 @@ pub fn run() {
         vault_search,
         library_pin,
         library_context_menu,
+        platform_info,
         vault_read,
         vault_write,
         vault_create,

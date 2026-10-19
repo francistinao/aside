@@ -35,6 +35,8 @@ tauri-plugin-opener = "2.7"
 # The scripts folder watcher, debounced 300 ms, as CLAUDE.md pins.
 notify = "8.2"
 notify-debouncer-full = "0.7"
+# Remembers the Library window bounds. The prompter is denylisted.
+tauri-plugin-window-state = "2.5"
 
 [dev-dependencies]
 # Temp folders for the vault tests.
