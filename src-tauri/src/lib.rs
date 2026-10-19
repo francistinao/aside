@@ -15,7 +15,7 @@ use session::engine::{Estimate, estimate};
 use session::tokenize::tokenize;
 use session::{Action, Control, ScriptPayload, SessionHandle};
 use settings::{Settings, SettingsPatch, SettingsState};
-use vault::{Entry, FileData, Vault};
+use vault::{ChosenFolder, Entry, FileData, Vault, VaultStatus};
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -81,8 +81,24 @@ fn session_estimate(markdown: String, wpm: u32) -> Estimate {
 }
 
 #[tauri::command]
+fn vault_status(vault: State<'_, Vault>) -> VaultStatus {
+    vault.status()
+}
+
+/// Async so the blocking native picker stays off the main thread.
+#[tauri::command]
+async fn vault_choose_folder(app: AppHandle) -> error::Result<Option<ChosenFolder>> {
+    app.state::<Vault>().choose_folder(&app)
+}
+
+#[tauri::command]
 fn vault_tree(vault: State<'_, Vault>) -> error::Result<Vec<Entry>> {
     vault.entries()
+}
+
+#[tauri::command]
+fn vault_reveal(vault: State<'_, Vault>, path: String) -> error::Result<()> {
+    vault.reveal(&path)
 }
 
 #[tauri::command]
@@ -149,7 +165,10 @@ fn follow_stats(prompter: State<'_, prompter::Prompter>) -> follow::FollowStats 
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let builder = tauri::Builder::default().plugin(tauri_plugin_store::Builder::new().build());
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init());
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
     #[cfg(debug_assertions)]
@@ -158,7 +177,10 @@ pub fn run() {
         session_set_lines,
         session_control,
         session_estimate,
+        vault_status,
+        vault_choose_folder,
         vault_tree,
+        vault_reveal,
         vault_read,
         vault_write,
         vault_create,
@@ -177,7 +199,10 @@ pub fn run() {
         session_set_lines,
         session_control,
         session_estimate,
+        vault_status,
+        vault_choose_folder,
         vault_tree,
+        vault_reveal,
         vault_read,
         vault_write,
         vault_create,

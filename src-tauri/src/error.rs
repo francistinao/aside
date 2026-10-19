@@ -12,6 +12,8 @@ pub enum Error {
     Store(#[from] tauri_plugin_store::Error),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    #[error(transparent)]
+    Opener(#[from] tauri_plugin_opener::Error),
     #[error("the main thread is not available")]
     NotMainThread,
     #[error("the {0} window does not exist")]

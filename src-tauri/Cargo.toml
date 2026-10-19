@@ -28,6 +28,10 @@ unicode-segmentation = "1.13"
 tauri-plugin-store = "2.5"
 # Delete scripts to the OS Trash, never permanently.
 trash = "5.2"
+# Native folder picker, the Keep Mine / Load from Disk dialog, the macOS capture notice.
+tauri-plugin-dialog = "2.8"
+# Show in Finder / Show in Explorer and opening the scripts folder.
+tauri-plugin-opener = "2.7"
 
 [dev-dependencies]
 # Temp folders for the vault tests.

@@ -10,13 +10,19 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime};
 
 use serde::Serialize;
+use tauri::{AppHandle, Manager};
+use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::error::{Error, Result};
 use crate::lock::lock;
+use crate::settings::SettingsState;
 
 const SCRIPT_EXT: &str = "md";
 const UNTITLED: &str = "Untitled";
 const NEW_FOLDER: &str = "New Folder";
+const DEFAULT_FOLDER: &str = "Aside";
+const WELCOME_SCRIPT: &str = "Welcome to Aside.md";
+const SAMPLE_SCRIPT: &str = include_str!("../../../assets/sample-script.md");
 /// How long after our own write the watcher may still see it echo back.
 const OWN_WRITE_WINDOW: Duration = Duration::from_secs(2);
 
@@ -44,6 +50,23 @@ pub struct Entry {
 pub struct FileData {
     pub content: String,
     pub modified: u64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultStatus {
+    pub folder: Option<String>,
+    /// True when a folder was chosen but is gone.
+    pub missing: bool,
+}
+
+/// What `choose_folder` hands back: the new listing and, on a fresh folder, the script to open.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChosenFolder {
+    pub folder: String,
+    pub entries: Vec<Entry>,
+    pub open: Option<String>,
 }
 
 /// Remembers what we just wrote so the watcher can tell our writes from the user's.
@@ -104,6 +127,68 @@ impl Vault {
     pub fn root(&self) -> Result<PathBuf> {
         let root = self.root_path().ok_or(Error::NoFolder)?;
         if root.is_dir() { Ok(root) } else { Err(Error::FolderMissing) }
+    }
+
+    pub fn status(&self) -> VaultStatus {
+        let folder = self.root_path();
+        VaultStatus {
+            missing: folder.as_ref().is_some_and(|f| !f.is_dir()),
+            folder: folder.map(|f| f.to_string_lossy().into_owned()),
+        }
+    }
+
+    /// First run and Choose Folder: a native picker that starts in Documents/Aside, which is
+    /// created so one click accepts the default. A folder with no scripts gets the welcome
+    /// script. Blocks, so call it from an async command.
+    pub fn choose_folder(&self, app: &AppHandle) -> Result<Option<ChosenFolder>> {
+        let start = app
+            .path()
+            .document_dir()
+            .map(|d| d.join(DEFAULT_FOLDER))
+            .unwrap_or_else(|_| PathBuf::from(DEFAULT_FOLDER));
+        let _ = fs::create_dir_all(&start);
+        let Some(picked) = app
+            .dialog()
+            .file()
+            .set_title("Choose a folder for your scripts")
+            .set_directory(&start)
+            .blocking_pick_folder()
+        else {
+            return Ok(None);
+        };
+        let folder = match picked {
+            FilePath::Path(path) => path,
+            FilePath::Url(url) => url.to_file_path().map_err(|_| Error::OutsideVault)?,
+        };
+        fs::create_dir_all(&folder)?;
+        app.state::<SettingsState>().modify(|s| {
+            s.scripts_folder = Some(folder.to_string_lossy().into_owned());
+            s.pins.clear();
+            s.recents.clear();
+        })?;
+        self.set_root(Some(folder.clone()));
+        let mut entries = self.entries()?;
+        let mut open = None;
+        if !entries.iter().any(|e| e.kind == EntryKind::Script) {
+            self.write(WELCOME_SCRIPT, SAMPLE_SCRIPT)?;
+            entries = self.entries()?;
+            open = Some(WELCOME_SCRIPT.to_string());
+        }
+        Ok(Some(ChosenFolder {
+            folder: folder.to_string_lossy().into_owned(),
+            entries,
+            open,
+        }))
+    }
+
+    /// Show in Finder or Show in Explorer. An empty path opens the scripts folder itself.
+    pub fn reveal(&self, relative: &str) -> Result<()> {
+        if relative.is_empty() {
+            tauri_plugin_opener::open_path(self.root()?, None::<&str>)?;
+        } else {
+            tauri_plugin_opener::reveal_item_in_dir(self.resolve(relative)?)?;
+        }
+        Ok(())
     }
 
     /// Turns a relative path from the frontend into an absolute one inside the folder.
