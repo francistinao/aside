@@ -14,6 +14,7 @@ use crate::settings::SettingsState;
 
 pub const LABEL: &str = "prompter";
 pub const LIBRARY: &str = "library";
+pub const SETTINGS: &str = "settings";
 pub const CAPTURE_EVENT: &str = "capture://status";
 /// Windows that show the capture status.
 const CAPTURE_LISTENERS: [&str; 2] = [LIBRARY, LABEL];
@@ -101,6 +102,13 @@ pub fn set_corner(app: &AppHandle, corner: Corner) {
     }
 }
 
+/// Feel, distance and flip, applied from the next frame on.
+pub fn set_follow(app: &AppHandle, config: FollowConfig) {
+    if let Some(follow) = lock(&app.state::<Prompter>().follow).as_ref() {
+        follow.set_config(config);
+    }
+}
+
 fn create(app: &AppHandle, state: &Prompter) -> Result<WebviewWindow> {
     let config = app
         .config()
@@ -119,8 +127,8 @@ fn create(app: &AppHandle, state: &Prompter) -> Result<WebviewWindow> {
         w: config.width,
         h: config.height,
     };
-    let corner = app.state::<SettingsState>().get().corner;
-    let handle = follow::spawn(app, &window, FollowConfig::default(), corner, bubble)?;
+    let settings = app.state::<SettingsState>().get();
+    let handle = follow::spawn(app, &window, settings.follow_config(), settings.corner, bubble)?;
     *lock(&state.follow) = Some(handle);
     Ok(window)
 }

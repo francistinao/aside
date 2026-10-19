@@ -80,6 +80,8 @@ pub struct PlaceParams {
     pub bubble: Size,
     pub edge_margin: f64,
     pub flip_hysteresis: f64,
+    /// Off: never flip, only clamp.
+    pub flip: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -130,22 +132,26 @@ pub fn place(
 ) -> Placement {
     let hysteresis = params.flip_hysteresis;
 
-    resolve_axis(
-        &mut flip.horizontal,
-        target_x(pointer, corner.is_right(), params),
-        params.bubble.w,
-        work_area.x,
-        work_area.right(),
-        hysteresis,
-    );
-    resolve_axis(
-        &mut flip.vertical,
-        target_y(pointer, corner.is_bottom(), params),
-        params.bubble.h,
-        work_area.y,
-        work_area.bottom(),
-        hysteresis,
-    );
+    if params.flip {
+        resolve_axis(
+            &mut flip.horizontal,
+            target_x(pointer, corner.is_right(), params),
+            params.bubble.w,
+            work_area.x,
+            work_area.right(),
+            hysteresis,
+        );
+        resolve_axis(
+            &mut flip.vertical,
+            target_y(pointer, corner.is_bottom(), params),
+            params.bubble.h,
+            work_area.y,
+            work_area.bottom(),
+            hysteresis,
+        );
+    } else {
+        *flip = FlipState::default();
+    }
 
     let right = corner.is_right() != flip.horizontal;
     let bottom = corner.is_bottom() != flip.vertical;
@@ -174,6 +180,7 @@ mod tests {
             bubble: Size { w: 380.0, h: 140.0 },
             edge_margin: 8.0,
             flip_hysteresis: 24.0,
+            flip: true,
         }
     }
 
@@ -199,6 +206,16 @@ mod tests {
             assert_eq!(placed.target, expected, "{corner:?}");
             assert_eq!(placed.corner, corner, "no flip expected for {corner:?}");
         }
+    }
+
+    #[test]
+    fn with_flip_off_the_corner_stays_and_the_bubble_is_clamped() {
+        let no_flip = PlaceParams { flip: false, ..params() };
+        let mut flip = FlipState { horizontal: true, vertical: true };
+        let placed = place(at(1300.0, 450.0), Corner::BottomRight, &no_flip, AREA, &mut flip);
+        assert_eq!(placed.corner, Corner::BottomRight);
+        assert_eq!(placed.target, at(AREA.w - 8.0 - 380.0, 474.0));
+        assert_eq!(flip, FlipState::default(), "a stale flip is cleared");
     }
 
     #[test]

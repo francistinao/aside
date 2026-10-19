@@ -9,6 +9,7 @@ use tauri_plugin_store::{Store, StoreExt};
 
 use crate::error::Result;
 use crate::follow::placement::Corner;
+use crate::follow::{Distance, Feel, FollowConfig};
 use crate::lock::lock;
 use crate::prompter;
 use crate::session::engine::{MAX_WPM, MIN_WPM};
@@ -17,6 +18,9 @@ use crate::session::{Control, Highlight, SessionHandle};
 const FILE: &str = "settings.json";
 const KEY: &str = "settings";
 pub const STYLE_EVENT: &str = "prompter://style";
+/// The full settings, sent after every save so every window shows the same values.
+pub const CHANGED_EVENT: &str = "settings://changed";
+const CHANGED_LISTENERS: [&str; 2] = [prompter::LIBRARY, prompter::SETTINGS];
 
 const WPM_STEP: u32 = 5;
 const MIN_OPACITY: u8 = 30;
@@ -46,6 +50,9 @@ pub struct Settings {
     pub corner: Corner,
     pub text_size: TextSize,
     pub hide_from_capture: bool,
+    pub follow: Feel,
+    pub distance: Distance,
+    pub flip_at_edges: bool,
     /// Absolute path of the scripts folder, None before first run.
     pub scripts_folder: Option<String>,
     /// Relative paths inside the scripts folder.
@@ -66,6 +73,9 @@ impl Default for Settings {
             corner: Corner::BottomRight,
             text_size: TextSize::Small,
             hide_from_capture: true,
+            follow: Feel::Smooth,
+            distance: Distance::Normal,
+            flip_at_edges: true,
             scripts_folder: None,
             pins: Vec::new(),
             recents: Vec::new(),
@@ -87,6 +97,9 @@ pub struct SettingsPatch {
     pub corner: Option<Corner>,
     pub text_size: Option<TextSize>,
     pub hide_from_capture: Option<bool>,
+    pub follow: Option<Feel>,
+    pub distance: Option<Distance>,
+    pub flip_at_edges: Option<bool>,
     pub sidebar_width: Option<u32>,
     pub sidebar_visible: Option<bool>,
     pub capture_notice_shown: Option<bool>,
@@ -112,6 +125,15 @@ impl Settings {
         if let Some(v) = patch.hide_from_capture {
             self.hide_from_capture = v;
         }
+        if let Some(v) = patch.follow {
+            self.follow = v;
+        }
+        if let Some(v) = patch.distance {
+            self.distance = v;
+        }
+        if let Some(v) = patch.flip_at_edges {
+            self.flip_at_edges = v;
+        }
         if let Some(v) = patch.sidebar_width {
             self.sidebar_width = v;
         }
@@ -122,6 +144,14 @@ impl Settings {
             self.capture_notice_shown = v;
         }
         self.normalized()
+    }
+
+    /// What the follow thread needs from the settings.
+    pub fn follow_config(&self) -> FollowConfig {
+        FollowConfig {
+            flip_at_edges: self.flip_at_edges,
+            ..FollowConfig::new(self.follow, self.distance)
+        }
     }
 
     /// Keeps every value inside the ranges the controls offer.
@@ -159,6 +189,7 @@ impl From<&Settings> for StylePayload {
 pub struct SettingsState {
     current: Mutex<Settings>,
     store: Arc<Store<Wry>>,
+    app: AppHandle,
 }
 
 impl SettingsState {
@@ -173,6 +204,7 @@ impl SettingsState {
         Ok(Self {
             current: Mutex::new(current),
             store,
+            app: app.clone(),
         })
     }
 
@@ -197,12 +229,24 @@ impl SettingsState {
         Ok(after)
     }
 
+    /// Saves when something changed, then tells every window. The lock is released before
+    /// the emit so a listener's own settings call cannot wait on it.
     fn replace(&self, after: Settings) -> Result<()> {
-        let mut current = lock(&self.current);
-        if *current != after {
-            self.store.set(KEY, serde_json::to_value(&after)?);
-            self.store.save()?;
-            *current = after;
+        let changed = {
+            let mut current = lock(&self.current);
+            if *current == after {
+                false
+            } else {
+                self.store.set(KEY, serde_json::to_value(&after)?);
+                self.store.save()?;
+                *current = after.clone();
+                true
+            }
+        };
+        if changed {
+            for label in CHANGED_LISTENERS {
+                let _ = self.app.emit_to(label, CHANGED_EVENT, &after);
+            }
         }
         Ok(())
     }
@@ -222,6 +266,9 @@ pub fn apply(app: &AppHandle, before: &Settings, after: &Settings) -> Result<()>
     }
     if after.hide_from_capture != before.hide_from_capture {
         prompter::set_capture(app, after.hide_from_capture)?;
+    }
+    if after.follow_config() != before.follow_config() {
+        prompter::set_follow(app, after.follow_config());
     }
     if StylePayload::from(after) != StylePayload::from(before) {
         emit_style(app, after)?;
@@ -264,6 +311,21 @@ mod tests {
     }
 
     #[test]
+    fn follow_settings_become_a_follow_config() {
+        let settings = Settings::default().patched(SettingsPatch {
+            follow: Some(Feel::Floaty),
+            distance: Some(Distance::Far),
+            flip_at_edges: Some(false),
+            ..Default::default()
+        });
+        let config = settings.follow_config();
+        assert_eq!(config.omega, 9.0);
+        assert_eq!(config.distance, 36.0);
+        assert!(!config.flip_at_edges);
+        assert_eq!(Settings::default().follow_config(), FollowConfig::default());
+    }
+
+    #[test]
     fn values_snap_to_their_steps() {
         let patched = Settings::default().patched(SettingsPatch {
             wpm: Some(163),
@@ -281,6 +343,9 @@ mod tests {
         assert_eq!(json["textSize"], "small");
         assert_eq!(json["hideFromCapture"], true);
         assert_eq!(json["corner"], "bottom-right");
+        assert_eq!(json["follow"], "smooth");
+        assert_eq!(json["distance"], "normal");
+        assert_eq!(json["flipAtEdges"], true);
         let back: Settings = serde_json::from_value(json).expect("deserialize");
         assert_eq!(back, Settings::default());
         let partial: Settings = serde_json::from_str(r#"{"wpm": 200}"#).expect("partial");

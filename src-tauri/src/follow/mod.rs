@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, Thread};
 use std::time::{Duration, Instant};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, WebviewWindow};
 
 use placement::{Corner, FlipState, PlaceParams, Point, Size, place};
@@ -24,9 +24,11 @@ use crate::lock::lock;
 pub const CORNER_EVENT: &str = "prompter://corner";
 
 /// The follow feel presets from docs/CURSOR-UX.md.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum Feel {
     Snappy,
+    #[default]
     Smooth,
     Floaty,
 }
@@ -43,9 +45,11 @@ impl Feel {
 }
 
 /// The distance presets from docs/CURSOR-UX.md.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum Distance {
     Close,
+    #[default]
     Normal,
     Far,
 }
@@ -73,6 +77,8 @@ pub struct FollowConfig {
     pub distance: f64,
     pub edge_margin: f64,
     pub flip_hysteresis: f64,
+    /// Off: the bubble keeps its corner and is only clamped inside the work area.
+    pub flip_at_edges: bool,
     pub active_hz: u32,
     pub idle_hz: u32,
 }
@@ -88,6 +94,7 @@ impl FollowConfig {
             distance: distance.points(),
             edge_margin: 8.0,
             flip_hysteresis: 24.0,
+            flip_at_edges: true,
             active_hz: 120,
             idle_hz: 20,
         }
@@ -116,6 +123,8 @@ struct Shared {
     active: AtomicBool,
     hz: AtomicU32,
     settled: AtomicBool,
+    /// Feel, distance and flip from the settings. Read once per frame.
+    config: Mutex<FollowConfig>,
     /// The corner the user chose. The loop flips away from it at screen edges.
     corner: Mutex<Corner>,
     /// Logical window size, kept in step with the overlay's layout.
@@ -144,6 +153,11 @@ impl FollowHandle {
         }
     }
 
+    /// Applies a new feel, distance or flip setting from the next frame on.
+    pub fn set_config(&self, config: FollowConfig) {
+        *lock(&self.shared.config) = config;
+    }
+
     pub fn set_corner(&self, corner: Corner) {
         *lock(&self.shared.corner) = corner;
     }
@@ -166,6 +180,7 @@ pub fn spawn(
         active: AtomicBool::new(false),
         hz: AtomicU32::new(0),
         settled: AtomicBool::new(false),
+        config: Mutex::new(config),
         corner: Mutex::new(corner),
         bubble: Mutex::new(bubble),
     });
@@ -174,7 +189,7 @@ pub fn spawn(
     let label = window.label().to_string();
     let join = thread::Builder::new()
         .name("follow".into())
-        .spawn(move || run(loop_app, label, platform, loop_shared, config))?;
+        .spawn(move || run(loop_app, label, platform, loop_shared))?;
     Ok(FollowHandle {
         shared,
         thread: join.thread().clone(),
@@ -204,9 +219,7 @@ fn distance(a: Point, b: Point) -> f64 {
     ((a.x - b.x).powi(2) + (a.y - b.y).powi(2)).sqrt()
 }
 
-fn run(app: AppHandle, label: String, mut platform: Platform, shared: Arc<Shared>, config: FollowConfig) {
-    let active_period = Duration::from_secs_f64(1.0 / f64::from(config.active_hz));
-    let idle_period = Duration::from_secs_f64(1.0 / f64::from(config.idle_hz));
+fn run(app: AppHandle, label: String, mut platform: Platform, shared: Arc<Shared>) {
     let mut state = Bubble::default();
     let mut flip = FlipState::default();
     let mut chosen_corner = *lock(&shared.corner);
@@ -231,6 +244,9 @@ fn run(app: AppHandle, label: String, mut platform: Platform, shared: Arc<Shared
         let now = Instant::now();
         let dt = clamp_dt(now.duration_since(last_frame).as_secs_f64());
         last_frame = now;
+        let config = *lock(&shared.config);
+        let active_period = Duration::from_secs_f64(1.0 / f64::from(config.active_hz));
+        let idle_period = Duration::from_secs_f64(1.0 / f64::from(config.idle_hz));
 
         let Some(sample) = platform.sample() else {
             thread::sleep(idle_period);
@@ -251,6 +267,7 @@ fn run(app: AppHandle, label: String, mut platform: Platform, shared: Arc<Shared
             },
             edge_margin: config.edge_margin * scale,
             flip_hysteresis: config.flip_hysteresis * scale,
+            flip: config.flip_at_edges,
         };
         let placement = place(sample.pointer, corner, &params, sample.work_area, &mut flip);
         if effective_corner != Some(placement.corner) {
