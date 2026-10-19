@@ -8,10 +8,15 @@ use windows::Win32::Graphics::Gdi::{
     GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromPoint,
 };
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
-use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    GetAsyncKeyState, VIRTUAL_KEY, VK_CONTROL, VK_LBUTTON, VK_LWIN, VK_MENU, VK_RBUTTON, VK_RWIN,
+    VK_SHIFT,
+};
+use windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, GetSystemMetrics, SM_SWAPBUTTON};
 
 use super::Sample;
 use crate::error::Result;
+use crate::follow::peek::Modifiers;
 use crate::follow::placement::{Point, Rect};
 
 const BASE_DPI: u32 = 96;
@@ -44,6 +49,9 @@ impl Platform {
         let (mut dpi_x, mut dpi_y) = (BASE_DPI, BASE_DPI);
         // SAFETY: valid out pointers. If the call fails the 96 dpi defaults stand.
         let _ = unsafe { GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y) };
+        // SAFETY: GetSystemMetrics has no preconditions.
+        let swapped = unsafe { GetSystemMetrics(SM_SWAPBUTTON) } != 0;
+        let primary = if swapped { VK_RBUTTON } else { VK_LBUTTON };
         Some(Sample {
             pointer: Point {
                 x: f64::from(point.x),
@@ -52,12 +60,26 @@ impl Platform {
             work_area: rect(info.rcWork),
             unit_scale: f64::from(dpi_x) / f64::from(BASE_DPI),
             pixels_per_unit: 1.0,
+            modifiers: Modifiers {
+                control: key_down(VK_CONTROL),
+                option: key_down(VK_MENU),
+                shift: key_down(VK_SHIFT),
+                command: key_down(VK_LWIN) || key_down(VK_RWIN),
+            },
+            primary_down: key_down(primary),
         })
     }
 
     pub fn move_to(&self, x: f64, y: f64) {
         let _ = self.window.set_position(PhysicalPosition::new(x as i32, y as i32));
     }
+}
+
+/// The high bit means down right now. No hook, no permission, no focus needed.
+fn key_down(key: VIRTUAL_KEY) -> bool {
+    // SAFETY: GetAsyncKeyState has no preconditions.
+    let state = unsafe { GetAsyncKeyState(i32::from(key.0)) };
+    state < 0
 }
 
 fn rect(r: RECT) -> Rect {

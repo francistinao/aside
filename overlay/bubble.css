@@ -32,6 +32,24 @@ body {
   text-align: left;
 }
 
+/* Peek and hide fade the bubble out over 80 ms and back over 160 ms. Fade while clicking
+   leaves a quarter. Reduced motion keeps these fades, per docs/CURSOR-UX.md. */
+.bubble {
+  opacity: 1;
+  transition: opacity var(--duration-peek-in) var(--ease-out);
+}
+
+.bubble[data-visibility="peeking"],
+.bubble[data-visibility="hidden"] {
+  opacity: 0;
+  transition-duration: var(--duration-peek-out);
+}
+
+.bubble[data-visibility="fading"] {
+  opacity: var(--prompter-fade-opacity);
+  transition-duration: var(--duration-peek-out);
+}
+
 .bubble[data-size="medium"] {
   --line: 28px;
   --prompter-font: var(--type-prompter-medium);

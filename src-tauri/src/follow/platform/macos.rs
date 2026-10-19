@@ -6,12 +6,13 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use objc2::MainThreadMarker;
-use objc2_app_kit::{NSEvent, NSScreen, NSWindow};
+use objc2_app_kit::{NSEvent, NSEventModifierFlags, NSScreen, NSWindow};
 use objc2_foundation::{NSPoint, NSRect};
 use tauri::{AppHandle, WebviewWindow};
 
 use super::Sample;
 use crate::error::{Error, Result};
+use crate::follow::peek::Modifiers;
 use crate::follow::placement::{Point, Rect};
 use crate::lock::lock;
 
@@ -56,6 +57,9 @@ impl Platform {
     pub fn sample(&mut self) -> Option<Sample> {
         self.refresh_screens_if_stale();
         let location = NSEvent::mouseLocation();
+        // Current device state, like mouseLocation: no event stream, no permission.
+        let flags = NSEvent::modifierFlags_class();
+        let buttons = NSEvent::pressedMouseButtons();
         let screens = lock(&self.screens);
         let pointer = Point {
             x: location.x,
@@ -71,6 +75,14 @@ impl Platform {
             work_area: screen.work_area,
             unit_scale: 1.0,
             pixels_per_unit: screen.scale,
+            modifiers: Modifiers {
+                control: flags.contains(NSEventModifierFlags::Control),
+                option: flags.contains(NSEventModifierFlags::Option),
+                shift: flags.contains(NSEventModifierFlags::Shift),
+                command: flags.contains(NSEventModifierFlags::Command),
+            },
+            // Bit 0 is the primary button, whichever physical button that is.
+            primary_down: buttons & 1 != 0,
         })
     }
 

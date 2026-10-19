@@ -7,6 +7,7 @@ use tauri::{AppHandle, Emitter, LogicalSize, Manager, WebviewWindow, WebviewWind
 
 use crate::capture::{self, CaptureStatus};
 use crate::error::{Error, Result};
+use crate::follow::peek::PeekKey;
 use crate::follow::placement::{Corner, Size};
 use crate::follow::{self, FollowConfig, FollowHandle, FollowStats};
 use crate::lock::lock;
@@ -109,6 +110,13 @@ pub fn set_follow(app: &AppHandle, config: FollowConfig) {
     }
 }
 
+pub fn set_peek(app: &AppHandle, key: PeekKey, fade: bool) {
+    if let Some(follow) = lock(&app.state::<Prompter>().follow).as_ref() {
+        follow.set_peek_key(key);
+        follow.set_fade(fade);
+    }
+}
+
 fn create(app: &AppHandle, state: &Prompter) -> Result<WebviewWindow> {
     let config = app
         .config()
@@ -128,7 +136,15 @@ fn create(app: &AppHandle, state: &Prompter) -> Result<WebviewWindow> {
         h: config.height,
     };
     let settings = app.state::<SettingsState>().get();
-    let handle = follow::spawn(app, &window, settings.follow_config(), settings.corner, bubble)?;
+    let handle = follow::spawn(
+        app,
+        &window,
+        settings.follow_config(),
+        settings.corner,
+        bubble,
+        settings.peek_key,
+        settings.fade_while_clicking,
+    )?;
     *lock(&state.follow) = Some(handle);
     Ok(window)
 }

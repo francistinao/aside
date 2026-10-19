@@ -1,6 +1,7 @@
 //! The follow loop: cursor polling, spring, placement. See docs/CURSOR-UX.md.
 //! One plain thread owns the whole loop. It never sends per-frame data over IPC.
 
+pub mod peek;
 pub mod placement;
 pub mod platform;
 pub mod spring;
@@ -13,6 +14,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, WebviewWindow};
 
+use peek::{Input, Peek, PeekKey, RETURN_DISTANCE, Visibility};
 use placement::{Corner, FlipState, PlaceParams, Point, Size, place};
 use platform::Platform;
 use spring::{cap_speed, clamp_dt, is_settled, spring_step};
@@ -22,6 +24,8 @@ use crate::lock::lock;
 
 /// Sent to the prompter only when the effective corner changes after an edge flip.
 pub const CORNER_EVENT: &str = "prompter://corner";
+/// Sent to the prompter only when peek, fade or hide changes what it should show.
+pub const VISIBILITY_EVENT: &str = "prompter://visibility";
 
 /// The follow feel presets from docs/CURSOR-UX.md.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -119,12 +123,21 @@ struct CornerPayload {
     corner: Corner,
 }
 
+#[derive(Clone, Copy, Serialize)]
+struct VisibilityPayload {
+    state: Visibility,
+}
+
 struct Shared {
     active: AtomicBool,
     hz: AtomicU32,
     settled: AtomicBool,
     /// Feel, distance and flip from the settings. Read once per frame.
     config: Mutex<FollowConfig>,
+    peek_key: Mutex<PeekKey>,
+    fade: AtomicBool,
+    /// The Show or Hide Prompter toggle.
+    hidden: AtomicBool,
     /// The corner the user chose. The loop flips away from it at screen edges.
     corner: Mutex<Corner>,
     /// Logical window size, kept in step with the overlay's layout.
@@ -158,6 +171,19 @@ impl FollowHandle {
         *lock(&self.shared.config) = config;
     }
 
+    pub fn set_peek_key(&self, key: PeekKey) {
+        *lock(&self.shared.peek_key) = key;
+    }
+
+    pub fn set_fade(&self, fade: bool) {
+        self.shared.fade.store(fade, Ordering::SeqCst);
+    }
+
+    /// Hidden keeps following at opacity 0; the window itself stays shown.
+    pub fn set_hidden(&self, hidden: bool) {
+        self.shared.hidden.store(hidden, Ordering::SeqCst);
+    }
+
     pub fn set_corner(&self, corner: Corner) {
         *lock(&self.shared.corner) = corner;
     }
@@ -174,6 +200,8 @@ pub fn spawn(
     config: FollowConfig,
     corner: Corner,
     bubble: Size,
+    peek_key: PeekKey,
+    fade: bool,
 ) -> Result<FollowHandle> {
     let platform = Platform::new(app, window)?;
     let shared = Arc::new(Shared {
@@ -181,6 +209,9 @@ pub fn spawn(
         hz: AtomicU32::new(0),
         settled: AtomicBool::new(false),
         config: Mutex::new(config),
+        peek_key: Mutex::new(peek_key),
+        fade: AtomicBool::new(fade),
+        hidden: AtomicBool::new(false),
         corner: Mutex::new(corner),
         bubble: Mutex::new(bubble),
     });
@@ -222,6 +253,8 @@ fn distance(a: Point, b: Point) -> f64 {
 fn run(app: AppHandle, label: String, mut platform: Platform, shared: Arc<Shared>) {
     let mut state = Bubble::default();
     let mut flip = FlipState::default();
+    let mut peek = Peek::default();
+    let mut last_visibility = None;
     let mut chosen_corner = *lock(&shared.corner);
     let mut effective_corner = None;
     let mut last_target = Point::default();
@@ -236,6 +269,8 @@ fn run(app: AppHandle, label: String, mut platform: Platform, shared: Arc<Shared
             shared.hz.store(0, Ordering::Relaxed);
             fresh = true;
             last_move = None;
+            // The next session starts visible even if the last one stopped mid peek.
+            last_visibility = None;
             thread::park();
             last_frame = Instant::now();
             continue;
@@ -252,13 +287,31 @@ fn run(app: AppHandle, label: String, mut platform: Platform, shared: Arc<Shared
             thread::sleep(idle_period);
             continue;
         };
+        let scale = sample.unit_scale;
+        peek.set_key(*lock(&shared.peek_key));
+        peek.set_fade(shared.fade.load(Ordering::SeqCst));
+        peek.set_hidden(shared.hidden.load(Ordering::SeqCst));
+        let visibility = peek.step(
+            now,
+            &Input {
+                modifiers: sample.modifiers,
+                primary_down: sample.primary_down,
+                pointer: sample.pointer,
+                return_distance: RETURN_DISTANCE * scale,
+            },
+        );
+        if last_visibility != Some(visibility) {
+            last_visibility = Some(visibility);
+            let payload = VisibilityPayload { state: visibility };
+            let _ = app.emit_to(label.as_str(), VISIBILITY_EVENT, payload);
+        }
+
         let corner = *lock(&shared.corner);
         let bubble = *lock(&shared.bubble);
         if corner != chosen_corner {
             chosen_corner = corner;
             flip = FlipState::default();
         }
-        let scale = sample.unit_scale;
         let params = PlaceParams {
             distance: config.distance * scale,
             bubble: Size {

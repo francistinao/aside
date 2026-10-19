@@ -132,6 +132,7 @@
   --duration-line: 140ms;
   --duration-peek-out: 80ms;
   --duration-peek-in: 160ms;
+  --prompter-fade-opacity: 0.25;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out: ease-out;
   --line-slide: 8px;

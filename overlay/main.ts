@@ -4,7 +4,7 @@ import '../assets/tokens.css';
 import './bubble.css';
 import type { ScriptPayload } from './script';
 import { View } from './view';
-import type { CaptureStatus, Corner, Position, StateEvent, Style } from './view';
+import type { CaptureStatus, Corner, Position, StateEvent, Style, Visibility } from './view';
 
 const root = document.getElementById('root') ?? document.body;
 const view = new View(root, {
@@ -17,4 +17,5 @@ void listen<Position>('session://position', (event) => view.setPosition(event.pa
 void listen<StateEvent>('session://state', (event) => view.setState(event.payload));
 void listen<Style>('prompter://style', (event) => view.setStyle(event.payload));
 void listen<{ corner: Corner }>('prompter://corner', (event) => view.setCorner(event.payload.corner));
+void listen<{ state: Visibility }>('prompter://visibility', (event) => view.setVisibility(event.payload.state));
 void listen<CaptureStatus>('capture://status', (event) => view.setStatus(event.payload));

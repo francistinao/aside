@@ -1,5 +1,6 @@
 //! Native pointer reading and window moves, one implementation per OS.
 
+use crate::follow::peek::Modifiers;
 use crate::follow::placement::{Point, Rect};
 
 #[cfg(target_os = "macos")]
@@ -22,4 +23,8 @@ pub struct Sample {
     pub unit_scale: f64,
     /// Physical pixels per loop unit, for rounding so text stays crisp.
     pub pixels_per_unit: f64,
+    /// Modifier keys held right now, for the peek key.
+    pub modifiers: Modifiers,
+    /// The primary mouse button, for fade while clicking.
+    pub primary_down: bool,
 }

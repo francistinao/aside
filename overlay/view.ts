@@ -12,6 +12,7 @@ export type Corner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 export type Highlight = 'word' | 'line';
 export type TextSize = 'small' | 'medium' | 'large';
 export type SessionState = 'idle' | 'countdown' | 'running' | 'paused' | 'ended';
+export type Visibility = 'visible' | 'peeking' | 'fading' | 'hidden';
 
 export interface Position {
   word: number | null;
@@ -97,6 +98,7 @@ export class View {
     this.bubble.dataset.mode = 'word';
     this.bubble.dataset.size = 'small';
     this.bubble.dataset.state = 'idle';
+    this.bubble.dataset.visibility = 'visible';
     this.bubble.setAttribute('aria-hidden', 'true');
 
     this.label = element('div', 'label');
@@ -219,6 +221,11 @@ export class View {
 
   setCorner(corner: Corner): void {
     this.bubble.dataset.corner = corner;
+  }
+
+  /// Peek, fade while clicking and the hide toggle. The CSS fades between the states.
+  setVisibility(state: Visibility): void {
+    this.bubble.dataset.visibility = state;
   }
 
   setStatus(status: CaptureStatus): void {

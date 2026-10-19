@@ -8,6 +8,7 @@ use tauri::{AppHandle, Emitter, Manager, Wry};
 use tauri_plugin_store::{Store, StoreExt};
 
 use crate::error::Result;
+use crate::follow::peek::PeekKey;
 use crate::follow::placement::Corner;
 use crate::follow::{Distance, Feel, FollowConfig};
 use crate::lock::lock;
@@ -53,6 +54,8 @@ pub struct Settings {
     pub follow: Feel,
     pub distance: Distance,
     pub flip_at_edges: bool,
+    pub peek_key: PeekKey,
+    pub fade_while_clicking: bool,
     /// Absolute path of the scripts folder, None before first run.
     pub scripts_folder: Option<String>,
     /// Relative paths inside the scripts folder.
@@ -76,6 +79,8 @@ impl Default for Settings {
             follow: Feel::Smooth,
             distance: Distance::Normal,
             flip_at_edges: true,
+            peek_key: PeekKey::Control,
+            fade_while_clicking: false,
             scripts_folder: None,
             pins: Vec::new(),
             recents: Vec::new(),
@@ -100,6 +105,8 @@ pub struct SettingsPatch {
     pub follow: Option<Feel>,
     pub distance: Option<Distance>,
     pub flip_at_edges: Option<bool>,
+    pub peek_key: Option<PeekKey>,
+    pub fade_while_clicking: Option<bool>,
     pub sidebar_width: Option<u32>,
     pub sidebar_visible: Option<bool>,
     pub capture_notice_shown: Option<bool>,
@@ -133,6 +140,12 @@ impl Settings {
         }
         if let Some(v) = patch.flip_at_edges {
             self.flip_at_edges = v;
+        }
+        if let Some(v) = patch.peek_key {
+            self.peek_key = v;
+        }
+        if let Some(v) = patch.fade_while_clicking {
+            self.fade_while_clicking = v;
         }
         if let Some(v) = patch.sidebar_width {
             self.sidebar_width = v;
@@ -270,6 +283,9 @@ pub fn apply(app: &AppHandle, before: &Settings, after: &Settings) -> Result<()>
     if after.follow_config() != before.follow_config() {
         prompter::set_follow(app, after.follow_config());
     }
+    if after.peek_key != before.peek_key || after.fade_while_clicking != before.fade_while_clicking {
+        prompter::set_peek(app, after.peek_key, after.fade_while_clicking);
+    }
     if StylePayload::from(after) != StylePayload::from(before) {
         emit_style(app, after)?;
     }
@@ -346,6 +362,8 @@ mod tests {
         assert_eq!(json["follow"], "smooth");
         assert_eq!(json["distance"], "normal");
         assert_eq!(json["flipAtEdges"], true);
+        assert_eq!(json["peekKey"], "control");
+        assert_eq!(json["fadeWhileClicking"], false);
         let back: Settings = serde_json::from_value(json).expect("deserialize");
         assert_eq!(back, Settings::default());
         let partial: Settings = serde_json::from_str(r#"{"wpm": 200}"#).expect("partial");
