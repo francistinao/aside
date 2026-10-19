@@ -82,7 +82,7 @@ pub fn set_visible(app: &AppHandle, visible: bool) -> Result<CaptureStatus> {
     }
 }
 
-/// Show or Hide Prompter (docs/CURSOR-UX.md): opacity 0 through the follow thread, never
+/// Show or Hide Prompter: opacity 0 through the follow thread, never
 /// `hide()`, and the script pauses while hidden and resumes on show if the hide paused it.
 pub fn set_hidden(app: &AppHandle, hidden: bool) {
     let state = app.state::<Prompter>();

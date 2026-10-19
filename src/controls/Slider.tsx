@@ -9,7 +9,7 @@ interface Props {
   onChange: (value: number) => void;
 }
 
-/// DESIGN.md slider: 4 px track, accent fill up to the knob, 18 px knob.
+/// A 4 px track, accent fill up to the knob, 18 px knob.
 export function Slider({ value, min, max, step, label, onChange }: Props) {
   const fraction = max > min ? (value - min) / (max - min) : 0;
   return (

@@ -1,4 +1,4 @@
-//! Hold to peek and fade while clicking, as docs/CURSOR-UX.md specifies. Pure: the loop
+//! Hold to peek and fade while clicking. Pure: the loop
 //! feeds it the time, the keys and the pointer each frame and emits only when the result
 //! changes. Hidden is the Show or Hide Prompter toggle and wins over everything.
 

@@ -1,4 +1,4 @@
-//! Keeping the bubble out of captures, and being honest about it. See docs/INVISIBILITY.md.
+//! Keeping the bubble out of captures, and being honest about it.
 
 use serde::Serialize;
 use tauri::WebviewWindow;

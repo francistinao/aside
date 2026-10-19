@@ -14,7 +14,7 @@ interface Props {
   onChange: (value: Corner) => void;
 }
 
-/// DESIGN.md corner picker: a 2 x 2 grid of small squares, the chosen one in accent.
+/// A 2 x 2 grid of small squares, the chosen one in accent.
 export function CornerPicker({ value, onChange }: Props) {
   return (
     <div className={styles.corners} role="radiogroup" aria-label="Position">

@@ -1,6 +1,6 @@
 # perf-m3
 
-Timing pages for the M3 performance checks in `docs/PERFORMANCE.md`, run in a plain
+Timing pages for the M3 performance checks, run in a plain
 WKWebView so the numbers come from the same engine Tauri uses on macOS.
 
 - `index.html` types 100 characters into a 20,000 word script with the real editor extensions.

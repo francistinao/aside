@@ -1,6 +1,6 @@
 // Times keystrokes in a 20,000 word script with the real editor extensions in WebKit.
 // A keystroke is one ProseMirror insertText transaction plus the layout it forces before
-// the next frame. docs/PERFORMANCE.md asks for under 16 ms each.
+// the next frame. The budget is 16 ms each.
 import { Editor } from '@tiptap/core';
 import { Marked, marked } from 'marked';
 import { editorExtensions } from '../../src/editor/extensions';

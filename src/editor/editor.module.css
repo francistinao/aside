@@ -239,7 +239,7 @@
   color: var(--label-secondary);
 }
 
-/* The pause chip, from docs/DESIGN.md. ProseMirror owns this DOM, so the class is global. */
+/* The pause chip. ProseMirror owns this DOM, so the class is global. */
 .prose :global(.pause-chip) {
   display: inline-flex;
   align-items: center;

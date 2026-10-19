@@ -5,7 +5,7 @@ interface Props {
   onNewScript: () => void;
 }
 
-/// Copy deck in docs/PRODUCT.md: "No Scripts" with one primary action.
+/// "No Scripts" with one primary action.
 export function EmptyLibrary({ onNewScript }: Props) {
   return (
     <div className={screen.center}>

@@ -6,7 +6,7 @@ interface Props {
   onChoose: () => void;
 }
 
-/// First run, or the folder went away. Copy from docs/PRODUCT.md.
+/// First run, or the folder went away.
 export function FolderScreen({ missing, onChoose }: Props) {
   return (
     <div className={screen.center}>

@@ -27,7 +27,6 @@ interface Props {
   onStop: () => void;
 }
 
-// Copy deck in docs/PRODUCT.md.
 const CAPTURE_LABEL: Record<CaptureStatus, string> = {
   hidden: 'Hidden',
   mayBeVisible: 'May be visible',

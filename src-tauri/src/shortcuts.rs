@@ -1,6 +1,6 @@
 //! Global shortcuts, registered while a session runs and released at Stop, so the keys
-//! belong to other apps when Aside is idle. The table is in docs/PRODUCT.md; Settings
-//! rebinds them. The peek key is not a shortcut: it is polled in the follow loop.
+//! belong to other apps when Aside is idle. Settings rebinds them. The peek key is not a
+//! shortcut: it is polled in the follow loop.
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;
@@ -45,7 +45,7 @@ impl ShortcutAction {
         ShortcutAction::Stop,
     ];
 
-    /// docs/PRODUCT.md defaults. Alt is Option on macOS, so one string serves both.
+    /// The defaults. Alt is Option on macOS, so one string serves both.
     pub fn default_accelerator(self) -> &'static str {
         match self {
             ShortcutAction::Pause => "Control+Alt+Space",

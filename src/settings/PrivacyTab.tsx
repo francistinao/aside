@@ -10,7 +10,6 @@ interface Props {
   onPatch: (patch: SettingsPatch) => void;
 }
 
-// Copy from docs/INVISIBILITY.md.
 const STATUS_LABEL: Record<CaptureStatus, string> = {
   hidden: 'Hidden',
   mayBeVisible: 'May be visible',

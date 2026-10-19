@@ -1,4 +1,4 @@
-//! Typed settings on top of tauri-plugin-store. Defaults come from docs/PRODUCT.md.
+//! Typed settings on top of tauri-plugin-store.
 //! A change is saved, applied to the running session and sent to the prompter.
 
 use std::sync::{Arc, Mutex};
@@ -30,7 +30,7 @@ const MIN_OPACITY: u8 = 30;
 const MAX_OPACITY: u8 = 100;
 const OPACITY_STEP: u8 = 5;
 
-/// Prompter text sizes from docs/DESIGN.md: 18, 20 and 24 px.
+/// Prompter text sizes: 18, 20 and 24 px.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum TextSize {

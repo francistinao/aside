@@ -269,7 +269,7 @@ impl Vault {
     }
 
     /// The open script changed on disk while it has unsaved edits. Blocks, so call it from an
-    /// async command. Copy from docs/PRODUCT.md.
+    /// async command.
     pub fn conflict_dialog(app: &AppHandle, name: &str) -> ConflictChoice {
         let result = app
             .dialog()

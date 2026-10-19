@@ -1,4 +1,4 @@
-//! Turns a script's markdown into the tokens the timing engine reads. See docs/PRODUCT.md.
+//! Turns a script's markdown into the tokens the timing engine reads.
 
 use pulldown_cmark::{Event, HeadingLevel, Parser, Tag, TagEnd};
 use serde::Serialize;

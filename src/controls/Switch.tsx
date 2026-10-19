@@ -8,7 +8,7 @@ interface Props {
   onChange: (checked: boolean) => void;
 }
 
-/// DESIGN.md switch: 32 x 18 capsule, white knob that slides over 160 ms.
+/// A 32 x 18 capsule with a white knob that slides over 160 ms.
 export function Switch({ checked, label, title, onChange }: Props) {
   return (
     <button

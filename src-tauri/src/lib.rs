@@ -93,7 +93,7 @@ fn session_start(
     #[cfg(target_os = "macos")]
     if !settings.get().capture_notice_shown {
         // Once, before the first session: macOS cannot promise to keep the bubble out of a
-        // full screen share. Copy from docs/INVISIBILITY.md. The session starts after OK.
+        // full screen share. The session starts after OK.
         use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
         settings.modify(|s| s.capture_notice_shown = true)?;
         let after = app.clone();
@@ -117,7 +117,7 @@ fn session_start(
 fn begin_session(app: &AppHandle, payload: ScriptPayload) -> error::Result<()> {
     // Accessory while a session runs: no Dock icon or app menu, so ordering the panel front
     // never activates Aside and pushes a full screen app out of its Space. Regular on Stop.
-    // Once per start and stop, never per focus change. See docs/INVISIBILITY.md.
+    // Once per start and stop, never per focus change.
     #[cfg(target_os = "macos")]
     app.set_activation_policy(tauri::ActivationPolicy::Accessory)?;
     prompter::set_visible(app, true)?;
@@ -528,7 +528,7 @@ pub fn run() {
         })
         .on_page_load(move |webview, payload| {
             // ASIDE_MEASURE_STARTUP=1 prints the time from run() to the Library's page load
-            // on stdout and quits. docs/PERFORMANCE.md explains how to read it.
+            // on stdout and quits.
             if webview.label() == prompter::LIBRARY
                 && matches!(payload.event(), PageLoadEvent::Finished)
                 && std::env::var_os("ASIDE_MEASURE_STARTUP").is_some()

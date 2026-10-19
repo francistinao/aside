@@ -144,7 +144,7 @@ mod tests {
         (dir, index)
     }
 
-    /// Performance check from docs/PERFORMANCE.md: 1,000 scripts of about 300 words.
+    /// Performance check: 1,000 scripts of about 300 words.
     /// Run with `cargo test -- --ignored --nocapture search_a_thousand_scripts`.
     #[test]
     #[ignore]

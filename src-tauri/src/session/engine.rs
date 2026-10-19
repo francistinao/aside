@@ -1,5 +1,5 @@
 //! The timing engine: one source of truth for playback and the duration estimate.
-//! Rules come from docs/PRODUCT.md. Time comes only from the injected clock.
+//! Time comes only from the injected clock.
 
 use std::time::{Duration, Instant};
 
@@ -19,7 +19,7 @@ impl Clock for SystemClock {
     }
 }
 
-/// Reading speed limits from docs/PRODUCT.md.
+/// Reading speed limits.
 pub const MIN_WPM: u32 = 80;
 pub const MAX_WPM: u32 = 220;
 

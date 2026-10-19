@@ -1,4 +1,4 @@
-//! The follow loop: cursor polling, spring, placement. See docs/CURSOR-UX.md.
+//! The follow loop: cursor polling, spring, placement.
 //! One plain thread owns the whole loop. It never sends per-frame data over IPC.
 
 pub mod peek;
@@ -27,7 +27,7 @@ pub const CORNER_EVENT: &str = "prompter://corner";
 /// Sent to the prompter only when peek, fade or hide changes what it should show.
 pub const VISIBILITY_EVENT: &str = "prompter://visibility";
 
-/// The follow feel presets from docs/CURSOR-UX.md.
+/// The follow feel presets.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Feel {
@@ -48,7 +48,7 @@ impl Feel {
     }
 }
 
-/// The distance presets from docs/CURSOR-UX.md.
+/// The distance presets.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Distance {

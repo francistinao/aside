@@ -12,7 +12,7 @@ interface Props<T extends string> {
   onChange: (value: T) => void;
 }
 
-/// DESIGN.md segmented control: 24 px, fill track, the selected segment raised.
+/// 24 px tall, fill track, the selected segment raised.
 export function Segmented<T extends string>({ value, options, label, onChange }: Props<T>) {
   return (
     <div className={styles.segmented} role="group" aria-label={label}>

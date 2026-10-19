@@ -40,7 +40,7 @@ export interface ViewCallbacks {
   onResize(width: number, height: number): void;
 }
 
-// Copy deck in docs/PRODUCT.md. Unsupported and Failed read as Visible; Settings explains why.
+// Unsupported and Failed read as Visible; Settings explains why.
 const STATUS_LABEL: Record<CaptureStatus, string> = {
   hidden: 'Hidden',
   mayBeVisible: 'May be visible',

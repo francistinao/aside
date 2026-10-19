@@ -1,4 +1,4 @@
-//! The menu bar extra on macOS and the tray icon on Windows: the menu from docs/PRODUCT.md,
+//! The menu bar extra on macOS and the tray icon on Windows: one native menu,
 //! kept in step with the session and the settings. The menu is rebuilt on state and
 //! settings changes; only the progress line is updated in place while a session runs.
 //! While a session runs Aside is an Accessory app, so this menu is the way back in.
@@ -213,7 +213,7 @@ fn corner_id(corner: Corner) -> &'static str {
     }
 }
 
-/// "0:58 of 2:45 · Word mode", as docs/PRODUCT.md shows it.
+/// "0:58 of 2:45 · Word mode".
 pub fn progress_line(status: &Status) -> String {
     let mode = match status.highlight {
         Highlight::Word => "Word",

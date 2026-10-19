@@ -1,4 +1,4 @@
-// Rule 8 in CLAUDE.md: no em dashes or en dashes anywhere. This scans every
+// No em dashes or en dashes anywhere. This scans every
 // text file git tracks or has staged, and fails lint when one slips in.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -20,6 +20,6 @@ for (const file of files) {
 }
 
 if (hits.length > 0) {
-  process.stderr.write(`Long dashes are not allowed (CLAUDE.md rule 8):\n${hits.join('\n')}\n`);
+  process.stderr.write(`Long dashes are not allowed:\n${hits.join('\n')}\n`);
   process.exit(1);
 }

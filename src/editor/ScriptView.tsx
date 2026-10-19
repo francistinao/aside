@@ -117,7 +117,7 @@ export function ScriptView({ path, name, content, modified, wpm, onSaved, onErro
   }, [editor, editorRef]);
 
   // The file changed on disk. With no unsaved edits it reloads quietly; otherwise the user
-  // chooses between their edits and the version on disk, exactly as PRODUCT.md says.
+  // chooses between their edits and the version on disk.
   const seenModified = useRef(modified);
   useEffect(() => {
     if (modified === seenModified.current) return;

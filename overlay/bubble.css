@@ -1,4 +1,4 @@
-/* The Prompter bubble. Values from docs/DESIGN.md through tokens.css. */
+/* The Prompter bubble. */
 
 html,
 body {
@@ -33,7 +33,7 @@ body {
 }
 
 /* Peek and hide fade the bubble out over 80 ms and back over 160 ms. Fade while clicking
-   leaves a quarter. Reduced motion keeps these fades, per docs/CURSOR-UX.md. */
+   leaves a quarter. Reduced motion keeps these fades. */
 .bubble {
   opacity: 1;
   transition: opacity var(--duration-peek-in) var(--ease-out);

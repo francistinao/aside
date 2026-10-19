@@ -28,11 +28,10 @@ mod panel {
 }
 
 /// Converts the prompter window into a panel that shows over other apps' full screen Spaces,
-/// following Apple's recipe for an auxiliary panel (docs/INVISIBILITY.md, "The overlay
-/// panel"). tauri-nspanel can only convert a built window, so the nonactivating mask is added
-/// after the swap through AppKit's public setter; tauri-nspanel's own `set_style_mask` calls
-/// a private selector. Content protection is applied again at the end, because the class
-/// swap and the style mask change both reset it.
+/// following Apple's recipe for an auxiliary panel. tauri-nspanel can only convert a built
+/// window, so the nonactivating mask is added after the swap through AppKit's public setter;
+/// tauri-nspanel's own `set_style_mask` calls a private selector. Content protection is
+/// applied again at the end, because the class swap and the style mask change both reset it.
 pub fn setup_panel(window: &WebviewWindow) -> Result<()> {
     let panel = window.to_panel::<PrompterPanel>()?;
     let ns_panel = panel.as_panel();
