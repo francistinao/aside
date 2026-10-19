@@ -2,6 +2,7 @@
 //! Creation, capture exclusion and the follow thread all start from the main thread.
 
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, WebviewWindow, WebviewWindowBuilder};
 
@@ -11,6 +12,8 @@ use crate::follow::peek::PeekKey;
 use crate::follow::placement::{Corner, Size};
 use crate::follow::{self, FollowConfig, FollowHandle, FollowStats};
 use crate::lock::lock;
+use crate::session::engine::StateKind;
+use crate::session::{Action, Control, SessionHandle};
 use crate::settings::SettingsState;
 
 pub const LABEL: &str = "prompter";
@@ -25,11 +28,19 @@ const CAPTURE_LISTENERS: [&str; 2] = [LIBRARY, LABEL];
 pub struct Prompter {
     capture: Mutex<CaptureStatus>,
     follow: Mutex<Option<FollowHandle>>,
+    /// The Show or Hide Prompter toggle.
+    hidden: AtomicBool,
+    /// True when hiding paused the script, so showing resumes it and only then.
+    paused_by_hide: AtomicBool,
 }
 
 impl Prompter {
     pub fn capture_status(&self) -> CaptureStatus {
         *lock(&self.capture)
+    }
+
+    pub fn is_hidden(&self) -> bool {
+        self.hidden.load(Ordering::SeqCst)
     }
 
     pub fn follow_stats(&self) -> FollowStats {
@@ -59,12 +70,42 @@ pub fn set_visible(app: &AppHandle, visible: bool) -> Result<CaptureStatus> {
         }
         Ok(status)
     } else {
+        // The next session starts shown.
+        state.hidden.store(false, Ordering::SeqCst);
+        state.paused_by_hide.store(false, Ordering::SeqCst);
         if let Some(follow) = lock(&state.follow).as_ref() {
+            follow.set_hidden(false);
             follow.set_active(false);
         }
         hide(app, &window)?;
         Ok(state.capture_status())
     }
+}
+
+/// Show or Hide Prompter (docs/CURSOR-UX.md): opacity 0 through the follow thread, never
+/// `hide()`, and the script pauses while hidden and resumes on show if the hide paused it.
+pub fn set_hidden(app: &AppHandle, hidden: bool) {
+    let state = app.state::<Prompter>();
+    let session = app.state::<SessionHandle>();
+    if state.hidden.swap(hidden, Ordering::SeqCst) == hidden {
+        return;
+    }
+    if let Some(follow) = lock(&state.follow).as_ref() {
+        follow.set_hidden(hidden);
+    }
+    if hidden {
+        if session.status().state == StateKind::Running {
+            state.paused_by_hide.store(true, Ordering::SeqCst);
+            session.send(Control::Act(Action::Pause));
+        }
+    } else if state.paused_by_hide.swap(false, Ordering::SeqCst) && session.status().state == StateKind::Paused {
+        session.send(Control::Act(Action::Resume));
+    }
+}
+
+pub fn toggle_hidden(app: &AppHandle) {
+    let hidden = app.state::<Prompter>().is_hidden();
+    set_hidden(app, !hidden);
 }
 
 /// Turns capture exclusion on or off for an existing bubble and reports the result.

@@ -6,6 +6,7 @@ pub mod engine;
 pub mod tokenize;
 
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -16,6 +17,7 @@ use engine::{Clock, Engine, Snapshot, StateKind, SystemClock};
 use tokenize::Token;
 
 use crate::error::Result;
+use crate::lock::lock;
 use crate::prompter;
 
 pub const SCRIPT_EVENT: &str = "session://script";
@@ -85,9 +87,21 @@ pub enum Control {
     Resend,
 }
 
+/// What the rest of the app may read about the session without asking the thread:
+/// the hide toggle pauses a running script, and the menu bar extra shows the progress.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Status {
+    pub state: StateKind,
+    pub title: String,
+    pub elapsed: f64,
+    pub total: f64,
+    pub highlight: Highlight,
+}
+
 /// Talks to the session thread. Managed by the Tauri builder.
 pub struct SessionHandle {
     tx: Sender<Control>,
+    status: Arc<Mutex<Status>>,
 }
 
 impl SessionHandle {
@@ -95,17 +109,34 @@ impl SessionHandle {
         // A closed channel means the thread is gone with the app. Nothing to do.
         let _ = self.tx.send(control);
     }
+
+    /// The last state the thread published. A control just sent may not show yet.
+    pub fn status(&self) -> Status {
+        lock(&self.status).clone()
+    }
 }
 
 pub fn spawn(app: AppHandle, wpm: u32, highlight: Highlight) -> Result<SessionHandle> {
     let (tx, rx) = mpsc::channel();
+    let status = Arc::new(Mutex::new(Status {
+        highlight,
+        ..Status::default()
+    }));
+    let shared = Arc::clone(&status);
     thread::Builder::new()
         .name("session".into())
-        .spawn(move || run(app, rx, SystemClock, wpm, highlight))?;
-    Ok(SessionHandle { tx })
+        .spawn(move || run(app, rx, SystemClock, wpm, highlight, shared))?;
+    Ok(SessionHandle { tx, status })
 }
 
-fn run<C: Clock>(app: AppHandle, rx: Receiver<Control>, clock: C, wpm: u32, highlight: Highlight) {
+fn run<C: Clock>(
+    app: AppHandle,
+    rx: Receiver<Control>,
+    clock: C,
+    wpm: u32,
+    highlight: Highlight,
+    status: Arc<Mutex<Status>>,
+) {
     let mut engine = Engine::new(clock, wpm);
     let mut script: Option<ScriptPayload> = None;
     let mut last: Option<Snapshot> = None;
@@ -147,7 +178,23 @@ fn run<C: Clock>(app: AppHandle, rx: Receiver<Control>, clock: C, wpm: u32, high
         engine.advance();
         let snapshot = engine.snapshot();
         emit_changes(&app, mode, last, snapshot);
+        publish(&status, &script, mode, snapshot);
         last = Some(snapshot);
+    }
+}
+
+/// Mirrors the snapshot for readers on other threads. Writes only when something changed.
+fn publish(status: &Mutex<Status>, script: &Option<ScriptPayload>, mode: Highlight, snapshot: Snapshot) {
+    let next = Status {
+        state: snapshot.state,
+        title: script.as_ref().map(|s| s.title.clone()).unwrap_or_default(),
+        elapsed: snapshot.elapsed,
+        total: snapshot.total,
+        highlight: mode,
+    };
+    let mut current = lock(status);
+    if *current != next {
+        *current = next;
     }
 }
 

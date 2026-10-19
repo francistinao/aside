@@ -62,9 +62,10 @@ pub fn estimate(tokens: &[Token], wpm: u32) -> Estimate {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum StateKind {
+    #[default]
     Idle,
     Countdown,
     Running,
