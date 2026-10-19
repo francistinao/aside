@@ -1,0 +1,169 @@
+/* Aside design tokens. Source of truth for every color, size and duration.
+   Values come from docs/DESIGN.md. Add a token here before using a new value. */
+
+:root {
+  color-scheme: dark;
+
+  /* Font stack. SF Pro on macOS through the system, Inter on Windows once bundled. */
+  --font-ui: -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+
+  /* Type scale as `font` shorthand values: weight size/line-height family. */
+  --type-large-title: 400 26px/32px var(--font-ui);
+  --type-title-1: 400 22px/26px var(--font-ui);
+  --type-title-2: 400 17px/22px var(--font-ui);
+  --type-title-3: 400 15px/20px var(--font-ui);
+  --type-headline: 700 13px/16px var(--font-ui);
+  --type-body: 400 13px/16px var(--font-ui);
+  --type-body-emphasized: 600 13px/16px var(--font-ui);
+  --type-callout: 400 12px/15px var(--font-ui);
+  --type-subheadline: 400 11px/14px var(--font-ui);
+  --type-subheadline-emphasized: 700 11px/14px var(--font-ui);
+  --type-caption: 400 10px/13px var(--font-ui);
+  --type-editor-body: 400 16px/26px var(--font-ui);
+  --type-editor-h1: 700 26px/32px var(--font-ui);
+  --type-editor-h2: 600 20px/26px var(--font-ui);
+  --type-editor-h3: 600 16px/22px var(--font-ui);
+  --type-prompter: 600 18px/26px var(--font-ui);
+  --type-prompter-medium: 600 20px/28px var(--font-ui);
+  --type-prompter-large: 600 24px/32px var(--font-ui);
+
+  /* Color. Apple's dark system colors. */
+  --label: rgba(255, 255, 255, 0.85);
+  --label-secondary: rgba(255, 255, 255, 0.55);
+  --label-tertiary: rgba(255, 255, 255, 0.25);
+  --label-quaternary: rgba(255, 255, 255, 0.1);
+  --separator: rgba(255, 255, 255, 0.1);
+  --fill: rgba(255, 255, 255, 0.08);
+  --fill-hover: rgba(255, 255, 255, 0.12);
+  --fill-pressed: rgba(255, 255, 255, 0.16);
+  --fill-selected: rgba(255, 255, 255, 0.1);
+  --fill-segment-selected: rgba(255, 255, 255, 0.18);
+  --bg-window: #1e1e1e;
+  --bg-elevated: #2a2a2c;
+  --sidebar-tint: rgba(30, 30, 32, 0.45);
+  --accent: #0a84ff;
+  --accent-pressed: #0071e3;
+  --on-accent: #ffffff;
+  --highlight: #ffd60a;
+  --on-highlight: #1d1d1f;
+  --destructive: #ff453a;
+  --success: #30d158;
+  --warning: #ff9f0a;
+  --focus-ring: rgba(10, 132, 255, 0.5);
+  --focus-ring-width: 3px;
+  --knob: #e5e5ea;
+  --knob-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --segment-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+
+  /* Materials. Glass only floats over content inside the webview. */
+  --glass-bg: rgba(40, 40, 42, 0.62);
+  --glass-blur: blur(30px) saturate(180%);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.12);
+  --glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  /* Prompter bubble. A plain fill, no blur: backdrop-filter cannot see the desktop. */
+  --prompter-fill-rgb: 28, 28, 30;
+  --prompter-opacity: 0.85;
+  --prompter-border: 1px solid rgba(255, 255, 255, 0.12);
+  --prompter-width: 360px;
+  --prompter-padding-y: 12px;
+  --prompter-padding-x: 14px;
+  --prompter-text: rgba(255, 255, 255, 1);
+  --prompter-text-previous: rgba(255, 255, 255, 0.35);
+  --prompter-text-unread: rgba(255, 255, 255, 0.55);
+  --prompter-text-next: rgba(255, 255, 255, 0.55);
+  --prompter-text-next-line-mode: rgba(255, 255, 255, 0.4);
+  --prompter-band: rgba(255, 255, 255, 0.1);
+  --prompter-heading: rgba(255, 255, 255, 0.4);
+  --prompter-footer: rgba(255, 255, 255, 0.55);
+  --prompter-footer-size: 11px;
+  --prompter-progress-track: rgba(255, 255, 255, 0.15);
+  --prompter-progress-fill: rgba(255, 255, 255, 0.7);
+  --prompter-progress-height: 2px;
+  --prompter-dot: 6px;
+  --prompter-highlight-padding: 1px 4px;
+
+  /* Shape. 4 px grid, concentric corners. */
+  --radius-sidebar-row: 8px;
+  --radius-control: 6px;
+  --radius-field: 8px;
+  --radius-popover: 12px;
+  --radius-bottom-bar: 18px;
+  --radius-prompter: 14px;
+  --radius-prompter-sharp: 4px;
+  --radius-highlight: 5px;
+  --radius-band: 6px;
+  --radius-corner-picker: 3px;
+
+  /* Spacing. Only these gaps. */
+  --gap-2: 2px;
+  --gap-4: 4px;
+  --gap-6: 6px;
+  --gap-8: 8px;
+  --gap-12: 12px;
+  --gap-16: 16px;
+  --gap-20: 20px;
+  --gap-24: 24px;
+  --gap-32: 32px;
+  --gap-48: 48px;
+
+  /* Controls and layout. */
+  --control-small: 22px;
+  --control-regular: 28px;
+  --control-large: 32px;
+  --hit-target: 28px;
+  --icon-size: 16px;
+  --toolbar-height: 52px;
+  --sidebar-width: 240px;
+  --sidebar-min-width: 200px;
+  --sidebar-max-width: 320px;
+  --writing-column: 680px;
+  --bottom-bar-height: 56px;
+  --bottom-bar-inset: 12px;
+  --settings-width: 560px;
+  --settings-height: 440px;
+
+  /* Motion. No bounce, no overshoot. */
+  --duration-press: 80ms;
+  --duration-toggle: 160ms;
+  --duration-popover-in: 200ms;
+  --duration-popover-out: 120ms;
+  --duration-line: 140ms;
+  --duration-peek-out: 80ms;
+  --duration-peek-in: 160ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: ease-out;
+  --line-slide: 8px;
+}
+
+/* Base styles shared by every window. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font: var(--type-body);
+  color: var(--label);
+  background: var(--bg-window);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}

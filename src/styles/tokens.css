@@ -1,0 +1,2 @@
+/* Re-exports assets/tokens.css so the app has one source of truth and nothing drifts. */
+@import "../../assets/tokens.css";
