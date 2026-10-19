@@ -155,6 +155,19 @@
   white-space: nowrap;
 }
 
+.renameInput {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding: 0 var(--gap-4);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--bg-window);
+  color: var(--label);
+  font: var(--type-body);
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+}
+
 .count {
   flex: none;
   font: var(--type-body);

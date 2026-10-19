@@ -8,11 +8,13 @@ const ICON = { size: 16, strokeWidth: 1.5 } as const;
 interface Props {
   row: Row;
   selected: boolean;
+  renaming: boolean;
   onSelect: (row: Row) => void;
   onContextMenu: (row: Row, x: number, y: number) => void;
+  onRename: (row: Row, name: string | null) => void;
 }
 
-export function SidebarRow({ row, selected, onSelect, onContextMenu }: Props) {
+export function SidebarRow({ row, selected, renaming, onSelect, onContextMenu, onRename }: Props) {
   if (row.kind === 'header') {
     return <div className={styles.header}>{row.label}</div>;
   }
@@ -40,7 +42,29 @@ export function SidebarRow({ row, selected, onSelect, onContextMenu }: Props) {
         <span className={styles.chevronSpace} />
       )}
       <Icon {...ICON} className={styles.icon} aria-hidden="true" />
-      <span className={styles.label}>{label}</span>
+      {renaming ? (
+        <input
+          className={styles.renameInput}
+          defaultValue={label}
+          aria-label="Name"
+          autoFocus
+          spellCheck={false}
+          onFocus={(event) => event.target.select()}
+          onClick={(event) => event.stopPropagation()}
+          onBlur={(event) => onRename(row, event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              onRename(row, event.currentTarget.value);
+            } else if (event.key === 'Escape') {
+              event.preventDefault();
+              onRename(row, null);
+            }
+          }}
+        />
+      ) : (
+        <span className={styles.label}>{label}</span>
+      )}
       {count !== null && count > 0 && <span className={styles.count}>{count}</span>}
     </div>
   );

@@ -52,3 +52,23 @@
   font: var(--type-body);
   color: var(--destructive);
 }
+
+.preview {
+  max-width: var(--writing-column);
+  margin: 0 auto;
+  padding: var(--gap-48) var(--gap-24) var(--gap-24);
+}
+
+.previewTitle {
+  margin: 0 0 var(--gap-16);
+  font: var(--type-editor-h1);
+  color: var(--label);
+}
+
+.previewBody {
+  margin: 0;
+  white-space: pre-wrap;
+  font: var(--type-editor-body);
+  color: var(--label-secondary);
+  user-select: text;
+}

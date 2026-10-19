@@ -22,7 +22,9 @@ interface Props {
   query: string;
   hits: Hit[];
   searchRef: RefObject<HTMLInputElement | null>;
+  renamingId: string | null;
   onQuery: (query: string) => void;
+  onRename: (row: Row, name: string | null) => void;
   onView: (view: SmartId) => void;
   onToggleFolder: (path: string, expanded: boolean) => void;
   onSelect: (id: string | null) => void;
@@ -33,8 +35,8 @@ interface Props {
 }
 
 export function Sidebar(props: Props) {
-  const { tree, view, expanded, selectedId, openPath, width, query, hits, searchRef, onQuery } = props;
-  const { onView, onToggleFolder, onSelect, onOpen, onContextMenu, onWidth, onNewScript } = props;
+  const { tree, view, expanded, selectedId, openPath, width, query, hits, searchRef, renamingId, onQuery } = props;
+  const { onView, onToggleFolder, onSelect, onOpen, onContextMenu, onWidth, onNewScript, onRename } = props;
   const searching = query.trim() !== '';
   const rows = useMemo(
     () => sidebarRows(buildTree(tree.entries), view, expanded, { recents: tree.recents, pinned: tree.pins }, tree.entries),
@@ -50,6 +52,7 @@ export function Sidebar(props: Props) {
   }
 
   function onKeyDown(event: React.KeyboardEvent) {
+    if (renamingId !== null) return;
     const current = rows.find((row) => row.id === selectedId) ?? null;
     switch (event.key) {
       case 'ArrowDown':
@@ -99,7 +102,15 @@ export function Sidebar(props: Props) {
       ) : (
         <div className={styles.list} role="tree" tabIndex={0} aria-label="Scripts" onKeyDown={onKeyDown}>
           {rows.map((row) => (
-            <SidebarRow key={row.id} row={row} selected={row.id === selectedId} onSelect={activate} onContextMenu={onContextMenu} />
+            <SidebarRow
+              key={row.id}
+              row={row}
+              selected={row.id === selectedId}
+              renaming={row.id === renamingId}
+              onSelect={activate}
+              onContextMenu={onContextMenu}
+              onRename={onRename}
+            />
           ))}
         </div>
       )}
