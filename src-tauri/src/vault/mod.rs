@@ -14,7 +14,7 @@ use std::time::{Duration, Instant, SystemTime};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
-use tauri_plugin_dialog::{DialogExt, FilePath};
+use tauri_plugin_dialog::{DialogExt, FilePath, MessageDialogButtons, MessageDialogKind, MessageDialogResult};
 
 use crate::error::{Error, Result};
 use crate::lock::lock;
@@ -64,6 +64,14 @@ pub struct Tree {
     pub entries: Vec<Entry>,
     pub pins: Vec<String>,
     pub recents: Vec<String>,
+}
+
+/// What the user chose when the open script changed under them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ConflictChoice {
+    Keep,
+    Load,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -258,6 +266,23 @@ impl Vault {
             entries,
             open,
         }))
+    }
+
+    /// The open script changed on disk while it has unsaved edits. Blocks, so call it from an
+    /// async command. Copy from docs/PRODUCT.md.
+    pub fn conflict_dialog(app: &AppHandle, name: &str) -> ConflictChoice {
+        let result = app
+            .dialog()
+            .message(format!("\"{name}\" changed on disk. Keep your edits or load the version on disk?"))
+            .title("This script changed on disk.")
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::OkCancelCustom("Keep Mine".into(), "Load from Disk".into()))
+            .blocking_show_with_result();
+        match result {
+            MessageDialogResult::Custom(label) if label == "Load from Disk" => ConflictChoice::Load,
+            MessageDialogResult::Cancel => ConflictChoice::Load,
+            _ => ConflictChoice::Keep,
+        }
     }
 
     /// Show in Finder or Show in Explorer. An empty path opens the scripts folder itself.

@@ -5,26 +5,33 @@
 import { useEffect } from 'react';
 import { isMac } from '../platform';
 
-export interface ShortcutHandlers {
-  toggleSidebar: () => void;
-  find: () => void;
+/// Returns the action id for a key event, or null. Ids match the menu item ids in menu.rs.
+export function shortcutAction(event: KeyboardEvent): string | null {
+  const key = event.key.toLowerCase();
+  const mod = isMac ? event.metaKey : event.ctrlKey;
+  if (!mod) return null;
+  const { shiftKey, altKey, ctrlKey } = event;
+  if (isMac ? ctrlKey && !shiftKey && !altKey && key === 's' : shiftKey && !altKey && key === 's') return 'view.toggle-sidebar';
+  if (!shiftKey && !altKey && key === 'f') return 'edit.find';
+  if (!altKey && key === 'n') return shiftKey ? 'file.new-folder' : 'file.new-script';
+  if (altKey && !shiftKey) {
+    if (event.code === 'Digit1') return 'format.title';
+    if (event.code === 'Digit2') return 'format.heading';
+    if (event.code === 'Digit3') return 'format.subheading';
+    if (event.code === 'Digit0') return 'format.body';
+  }
+  return null;
 }
 
-export function useShortcuts(handlers: ShortcutHandlers): void {
+export function useShortcuts(dispatch: (id: string) => void): void {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      const key = event.key.toLowerCase();
-      const mod = isMac ? event.metaKey : event.ctrlKey;
-      const toggle = isMac ? event.metaKey && event.ctrlKey && key === 's' : event.ctrlKey && event.shiftKey && key === 's';
-      if (toggle) {
-        event.preventDefault();
-        handlers.toggleSidebar();
-      } else if (mod && !event.shiftKey && !event.altKey && key === 'f') {
-        event.preventDefault();
-        handlers.find();
-      }
+      const id = shortcutAction(event);
+      if (id === null) return;
+      event.preventDefault();
+      dispatch(id);
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handlers]);
+  }, [dispatch]);
 }

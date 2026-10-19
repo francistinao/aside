@@ -19,7 +19,7 @@ use session::tokenize::tokenize;
 use session::{Action, Control, ScriptPayload, SessionHandle};
 use settings::{Settings, SettingsPatch, SettingsState};
 use vault::index::Hit;
-use vault::{ChosenFolder, FileData, Tree, Vault, VaultStatus};
+use vault::{ChosenFolder, ConflictChoice, FileData, Tree, Vault, VaultStatus};
 
 /// What the Library needs to know about the platform before it paints.
 #[derive(Clone, Copy, Debug, Serialize)]
@@ -135,6 +135,17 @@ fn library_pin(
     pinned: bool,
 ) -> error::Result<Vec<String>> {
     vault.set_pinned(&settings, &path, pinned)
+}
+
+/// Async: the native dialog blocks until the user answers.
+#[tauri::command]
+async fn vault_conflict_dialog(app: AppHandle, name: String) -> ConflictChoice {
+    Vault::conflict_dialog(&app, &name)
+}
+
+#[tauri::command]
+fn library_popup_menu(app: AppHandle, kind: menu::PopupKind, x: f64, y: f64) -> error::Result<()> {
+    menu::popup_menu(&app, kind, x, y)
 }
 
 #[tauri::command]
@@ -295,6 +306,8 @@ pub fn run() {
         vault_search,
         library_pin,
         library_context_menu,
+        library_popup_menu,
+        vault_conflict_dialog,
         platform_info,
         library_flushed,
         vault_read,
@@ -322,6 +335,8 @@ pub fn run() {
         vault_search,
         library_pin,
         library_context_menu,
+        library_popup_menu,
+        vault_conflict_dialog,
         platform_info,
         library_flushed,
         vault_read,
@@ -353,6 +368,8 @@ pub fn run() {
             let settings = SettingsState::load(app.handle())?;
             let current = settings.get();
             app.manage(settings);
+            #[cfg(target_os = "macos")]
+            app.set_menu(menu::app_menu(app.handle())?)?;
             let vault = Vault::new(current.scripts_folder.as_deref().map(std::path::PathBuf::from));
             // A missing folder is reported to the Library on its first call, not here.
             let _ = vault.start_watching(app.handle());

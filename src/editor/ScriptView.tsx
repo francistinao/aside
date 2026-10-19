@@ -27,13 +27,19 @@ interface Props {
   path: string;
   name: string;
   content: string;
+  /// The file's modification time. A change while the script is open means it was edited elsewhere.
+  modified: number;
   wpm: number;
   onSaved: (modified: number) => void;
   onError: (reason: unknown) => void;
   onToggleSidebar: () => void;
   /// Set so the window can save before it closes or the app quits.
   flushRef: MutableRefObject<(() => Promise<void>) | null>;
+  /// Set so menu and keyboard actions can reach the editor.
+  editorRef: MutableRefObject<Editor | null>;
 }
+
+type ConflictChoice = 'keep' | 'load';
 
 interface PopoverState {
   pos: number;
@@ -44,7 +50,7 @@ interface PopoverState {
 
 /// One open script: its toolbar, editor and autosave. The parent keys it by path, so
 /// switching scripts unmounts this one (which flushes) and mounts a fresh one.
-export function ScriptView({ path, name, content, wpm, onSaved, onError, onToggleSidebar, flushRef }: Props) {
+export function ScriptView({ path, name, content, modified, wpm, onSaved, onError, onToggleSidebar, flushRef, editorRef }: Props) {
   const [readOnly, setReadOnly] = useState(false);
   const [popover, setPopover] = useState<PopoverState | null>(null);
   const container = useRef<HTMLDivElement | null>(null);
@@ -104,6 +110,37 @@ export function ScriptView({ path, name, content, wpm, onSaved, onError, onToggl
   }, [editor, requestEstimate]);
 
   useEffect(() => {
+    editorRef.current = editor;
+    return () => {
+      editorRef.current = null;
+    };
+  }, [editor, editorRef]);
+
+  // The file changed on disk. With no unsaved edits it reloads quietly; otherwise the user
+  // chooses between their edits and the version on disk, exactly as PRODUCT.md says.
+  const seenModified = useRef(modified);
+  useEffect(() => {
+    if (modified === seenModified.current) return;
+    seenModified.current = modified;
+    const load = () => {
+      autosave.cancel();
+      editor.commands.setContent(content, { contentType: 'markdown', emitUpdate: false });
+      serialized.current = null;
+      requestEstimate(editor);
+    };
+    if (!autosave.pending()) {
+      load();
+      return;
+    }
+    invoke<ConflictChoice>('vault_conflict_dialog', { name })
+      .then((choice) => {
+        if (choice === 'load') load();
+        else void autosave.flush();
+      })
+      .catch(onError);
+  }, [modified, content, name, autosave, editor, requestEstimate, onError]);
+
+  useEffect(() => {
     flushRef.current = () => autosave.flush();
     const onBlur = () => void autosave.flush();
     window.addEventListener('blur', onBlur);
@@ -143,7 +180,7 @@ export function ScriptView({ path, name, content, wpm, onSaved, onError, onToggl
 
   return (
     <>
-      <Toolbar editor={readOnly ? null : editor} name={name} onToggleSidebar={onToggleSidebar} />
+      <Toolbar editor={readOnly ? null : editor} name={name} modified={modified} onToggleSidebar={onToggleSidebar} onError={onError} />
       <section className={styles.scroll}>
         <div ref={container} className={styles.editor}>
           {readOnly && <ReadOnlyBanner onEditAnyway={editAnyway} />}

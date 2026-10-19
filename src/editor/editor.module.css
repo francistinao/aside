@@ -33,12 +33,25 @@
   outline-offset: 0;
 }
 
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1;
+}
+
 .title {
   font: var(--type-headline);
   color: var(--label);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.edited {
+  font: var(--type-subheadline);
+  color: var(--label-secondary);
+  white-space: nowrap;
 }
 
 .spacer {

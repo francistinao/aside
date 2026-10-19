@@ -12,6 +12,8 @@ fn main() {
         "vault_search",
         "library_pin",
         "library_context_menu",
+        "library_popup_menu",
+        "vault_conflict_dialog",
         "platform_info",
         "library_flushed",
         "vault_read",

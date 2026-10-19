@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Editor } from '@tiptap/core';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './App.module.css';
 import { ScriptView } from './editor/ScriptView';
 import { Toolbar } from './editor/Toolbar';
@@ -21,6 +22,7 @@ interface ShellSettings {
 }
 
 const DEFAULT_SHELL: ShellSettings = { sidebarWidth: 240, sidebarVisible: true, wpm: 150 };
+const PERSIST_DELAY_MS = 150;
 
 interface MenuAction {
   id: string;
@@ -37,6 +39,7 @@ function scriptName(path: string): string {
 
 export function App() {
   const [shell, setShell] = useState<ShellSettings>(DEFAULT_SHELL);
+  const [shellLoaded, setShellLoaded] = useState(false);
   const [view, setView] = useState<SmartId>('all');
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -47,9 +50,60 @@ export function App() {
   const [file, setFile] = useState<{ path: string; data: FileData } | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const flushRef = useRef<(() => Promise<void>) | null>(null);
+  const editorRef = useRef<Editor | null>(null);
   const library = useVault();
   const { open, openPath, refresh, createScript, createFolder } = library;
   const report = useCallback((reason: unknown) => setError(describeError(reason)), []);
+
+  useEffect(() => {
+    let active = true;
+    invoke<ShellSettings>('settings_get')
+      .then((value) => {
+        if (!active) return;
+        setShell({ sidebarWidth: value.sidebarWidth, sidebarVisible: value.sidebarVisible, wpm: value.wpm });
+        setShellLoaded(true);
+      })
+      .catch(report);
+    return () => {
+      active = false;
+    };
+  }, [report]);
+
+  // Sidebar width and visibility are remembered. A drag writes once it rests.
+  useEffect(() => {
+    if (!shellLoaded) return;
+    const timer = setTimeout(() => {
+      invoke('settings_set', { patch: { sidebarWidth: shell.sidebarWidth, sidebarVisible: shell.sidebarVisible } }).catch(report);
+    }, PERSIST_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [shell.sidebarWidth, shell.sidebarVisible, shellLoaded, report]);
+
+  const toggleSidebar = useCallback(() => setShell((current) => ({ ...current, sidebarVisible: !current.sidebarVisible })), []);
+
+  const find = useCallback(() => {
+    setShell((current) => (current.sidebarVisible ? current : { ...current, sidebarVisible: true }));
+    searchRef.current?.focus();
+    searchRef.current?.select();
+  }, []);
+
+  // Results follow the query with a short rest, and refresh when the folder changes.
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed === '') return;
+    let active = true;
+    const timer = setTimeout(() => {
+      vault
+        .search(trimmed)
+        .then((found) => {
+          if (active) setHits(found);
+        })
+        .catch(report);
+    }, 100);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [query, library.tree, report]);
 
   // The open script is read whenever it or the folder changes.
   useEffect(() => {
@@ -71,23 +125,6 @@ export function App() {
     setFile((current) => (current === null ? current : { ...current, data: { ...current.data, modified } }));
   }, []);
 
-  // Rust asks for a flush before the window closes or the app quits, then finishes the job.
-  useEffect(() => {
-    let active = true;
-    let stop: (() => void) | null = null;
-    void listen<FlushRequest>('library://flush', (event) => {
-      const flush = flushRef.current?.() ?? Promise.resolve();
-      void flush.finally(() => invoke('library_flushed', { then: event.payload.then }).catch(report));
-    }).then((unlisten) => {
-      if (active) stop = unlisten;
-      else unlisten();
-    });
-    return () => {
-      active = false;
-      stop?.();
-    };
-  }, [report]);
-
   /// Opening from the sidebar selects the row and reveals its folders.
   const openScript = useCallback(
     (path: string) => {
@@ -106,18 +143,75 @@ export function App() {
     [open],
   );
 
+  // Rust asks for a flush before the window closes or the app quits, then finishes the job.
+  useEffect(() => {
+    let active = true;
+    let stop: (() => void) | null = null;
+    void listen<FlushRequest>('library://flush', (event) => {
+      const flush = flushRef.current?.() ?? Promise.resolve();
+      void flush.finally(() => invoke('library_flushed', { then: event.payload.then }).catch(report));
+    }).then((unlisten) => {
+      if (active) stop = unlisten;
+      else unlisten();
+    });
+    return () => {
+      active = false;
+      stop?.();
+    };
+  }, [report]);
+
+  /// Every menu item, context menu item and keyboard shortcut lands here.
   const act = useCallback(
     (action: MenuAction) => {
       const path = action.path ?? openPath ?? '';
       const isFolder = library.tree?.entries.some((entry) => entry.path === path && entry.kind === 'folder') ?? false;
       const dir = path === '' ? '' : isFolder ? path : parentOf(path);
       const done = (task: Promise<unknown>) => task.then(() => refresh()).catch(report);
+      const chain = () => editorRef.current?.chain().focus();
       switch (action.id) {
+        case 'view.toggle-sidebar':
+          toggleSidebar();
+          break;
+        case 'edit.find':
+          find();
+          break;
+        case 'file.show-folder':
+          vault.reveal('').catch(report);
+          break;
+        case 'format.bold':
+          chain()?.toggleBold().run();
+          break;
+        case 'format.italic':
+          chain()?.toggleItalic().run();
+          break;
+        case 'format.title':
+          chain()?.toggleHeading({ level: 1 }).run();
+          break;
+        case 'format.heading':
+          chain()?.toggleHeading({ level: 2 }).run();
+          break;
+        case 'format.subheading':
+          chain()?.toggleHeading({ level: 3 }).run();
+          break;
+        case 'format.body':
+          chain()?.setParagraph().run();
+          break;
+        case 'format.bulleted-list':
+          chain()?.toggleBulletList().run();
+          break;
+        case 'format.numbered-list':
+          chain()?.toggleOrderedList().run();
+          break;
+        case 'format.insert-pause':
+          chain()?.insertPause().run();
+          break;
+        case 'file.new-script':
         case 'new-script':
           createScript(dir)
             .then((created) => setRenamingId(scriptRowId(created)))
             .catch(report);
           break;
+        case 'file.new-folder':
         case 'new-folder':
           createFolder(dir)
             .then((created) => {
@@ -145,8 +239,11 @@ export function App() {
           break;
       }
     },
-    [openPath, library.tree, refresh, report, createScript, createFolder, open],
+    [openPath, library.tree, refresh, report, createScript, createFolder, open, toggleSidebar, find],
   );
+
+  const dispatch = useCallback((id: string) => act({ id }), [act]);
+  useShortcuts(dispatch);
 
   useEffect(() => {
     let active = true;
@@ -178,59 +275,10 @@ export function App() {
       .catch(report);
   }
 
-  useEffect(() => {
-    let active = true;
-    invoke<ShellSettings>('settings_get')
-      .then((value) => {
-        if (active) setShell({ sidebarWidth: value.sidebarWidth, sidebarVisible: value.sidebarVisible, wpm: value.wpm });
-      })
-      .catch(report);
-    return () => {
-      active = false;
-    };
-  }, [report]);
-
-  const saveShell = useCallback((patch: Partial<ShellSettings>) => {
-    setShell((current) => ({ ...current, ...patch }));
-    invoke('settings_set', { patch }).catch(report);
-  }, [report]);
-
-  const shortcuts = useMemo(
-    () => ({
-      toggleSidebar: () => saveShell({ sidebarVisible: !shell.sidebarVisible }),
-      find: () => {
-        if (!shell.sidebarVisible) saveShell({ sidebarVisible: true });
-        searchRef.current?.focus();
-        searchRef.current?.select();
-      },
-    }),
-    [saveShell, shell.sidebarVisible],
-  );
-  useShortcuts(shortcuts);
-
-  // Results follow the query with a short rest, and refresh when the folder changes.
-  useEffect(() => {
-    const trimmed = query.trim();
-    if (trimmed === '') return;
-    let active = true;
-    const timer = setTimeout(() => {
-      vault
-        .search(trimmed)
-        .then((found) => {
-          if (active) setHits(found);
-        })
-        .catch(report);
-    }, 100);
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [query, library.tree, report]);
-
-  function toggleFolder(path: string, open: boolean) {
+  function toggleFolder(path: string, isOpen: boolean) {
     setExpanded((current) => {
       const next = new Set(current);
-      if (open) next.add(path);
+      if (isOpen) next.add(path);
       else next.delete(path);
       return next;
     });
@@ -274,7 +322,7 @@ export function App() {
             onSelect={setSelectedId}
             onOpen={openScript}
             onContextMenu={contextMenu}
-            onWidth={(value, commit) => (commit ? saveShell({ sidebarWidth: value }) : setShell((s) => ({ ...s, sidebarWidth: value })))}
+            onWidth={(value) => setShell((current) => ({ ...current, sidebarWidth: value }))}
             onNewScript={newScript}
           />
         )}
@@ -286,15 +334,17 @@ export function App() {
             path={openPath}
             name={scriptName(openPath)}
             content={shownFile.content}
+            modified={shownFile.modified}
             wpm={shell.wpm}
             onSaved={saved}
             onError={report}
-            onToggleSidebar={shortcuts.toggleSidebar}
+            onToggleSidebar={toggleSidebar}
             flushRef={flushRef}
+            editorRef={editorRef}
           />
         ) : (
           <>
-            <Toolbar editor={null} name={null} onToggleSidebar={shortcuts.toggleSidebar} />
+            <Toolbar editor={null} name={null} modified={null} onToggleSidebar={toggleSidebar} onError={report} />
             <section className={styles.content}>
               {folderProblem && <FolderScreen missing={library.phase === 'missing'} onChoose={() => void library.chooseFolder()} />}
               {noScripts && <EmptyLibrary onNewScript={newScript} />}
