@@ -1,0 +1,123 @@
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 var(--gap-12);
+  outline: none;
+}
+
+.list:focus-visible {
+  box-shadow: inset 0 0 0 var(--focus-ring-width) var(--focus-ring);
+}
+
+.header {
+  margin: var(--gap-20) 0 var(--gap-6);
+  padding: 0 var(--gap-8);
+  font: var(--type-subheadline-emphasized);
+  color: var(--label-secondary);
+  user-select: none;
+}
+
+.header:first-child {
+  margin-top: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-6);
+  height: var(--control-regular);
+  padding-right: var(--gap-8);
+  border-radius: var(--radius-sidebar-row);
+  font: var(--type-body);
+  color: var(--label);
+  user-select: none;
+  cursor: default;
+}
+
+.row:hover {
+  background: var(--fill-hover);
+}
+
+.selected,
+.selected:hover {
+  background: var(--fill-selected);
+}
+
+.selected .icon {
+  color: var(--accent);
+}
+
+.icon {
+  flex: none;
+  color: var(--label-secondary);
+}
+
+.chevron,
+.chevronSpace {
+  flex: none;
+  width: 12px;
+  color: var(--label-tertiary);
+  transition: transform var(--duration-toggle) var(--ease-standard);
+}
+
+.chevron.open {
+  transform: rotate(90deg);
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  flex: none;
+  font: var(--type-body);
+  color: var(--label-secondary);
+}
+
+.footer {
+  flex: none;
+  padding: var(--gap-12);
+}
+
+.newScript {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-6);
+  width: 100%;
+  height: var(--control-regular);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--fill);
+  color: var(--label);
+  font: var(--type-body);
+  transition: background var(--duration-press) linear;
+}
+
+.newScript:hover {
+  background: var(--fill-hover);
+}
+
+.newScript:active {
+  background: var(--fill-pressed);
+}
+
+.newScript:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+/* The drag handle hugs the sidebar's right edge. */
+.handle {
+  position: absolute;
+  top: 0;
+  right: calc(-1 * var(--gap-2));
+  bottom: 0;
+  width: var(--gap-4);
+  cursor: col-resize;
+}
