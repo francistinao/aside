@@ -9,6 +9,7 @@ pub mod settings;
 pub mod shortcuts;
 #[cfg(windows)]
 pub mod topmost;
+pub mod tray;
 pub mod vault;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -132,6 +133,17 @@ fn stop_session(app: &AppHandle) -> error::Result<()> {
     #[cfg(target_os = "macos")]
     app.set_activation_policy(tauri::ActivationPolicy::Regular)?;
     app.state::<SessionHandle>().send(Control::Act(Action::Stop));
+    Ok(())
+}
+
+/// Brings the Library back: a hidden window needs unminimize, show, then focus, in that order.
+pub(crate) fn show_library(app: &AppHandle) -> error::Result<()> {
+    let window = app
+        .get_webview_window(prompter::LIBRARY)
+        .ok_or(error::Error::MissingWindow(prompter::LIBRARY))?;
+    window.unminimize()?;
+    window.show()?;
+    window.set_focus()?;
     Ok(())
 }
 
@@ -478,6 +490,7 @@ pub fn run() {
             app.manage(vault);
             let session = session::spawn(app.handle().clone(), current.wpm, current.highlight)?;
             app.manage(session);
+            tray::setup(app.handle())?;
             Ok(())
         })
         .on_page_load(move |webview, payload| {
@@ -510,10 +523,7 @@ pub fn run() {
             }
             #[cfg(target_os = "macos")]
             RunEvent::Reopen { .. } => {
-                if let Some(window) = app.get_webview_window(prompter::LIBRARY) {
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
+                let _ = show_library(app);
             }
             #[cfg(windows)]
             RunEvent::Exit => topmost::remove(),

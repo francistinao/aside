@@ -178,23 +178,32 @@ fn run<C: Clock>(
         engine.advance();
         let snapshot = engine.snapshot();
         emit_changes(&app, mode, last, snapshot);
-        publish(&status, &script, mode, snapshot);
+        publish(&app, &status, &script, mode, snapshot);
         last = Some(snapshot);
     }
 }
 
-/// Mirrors the snapshot for readers on other threads. Writes only when something changed.
-fn publish(status: &Mutex<Status>, script: &Option<ScriptPayload>, mode: Highlight, snapshot: Snapshot) {
+/// Mirrors the snapshot for readers on other threads and tells the menu bar extra, once per
+/// change and at most once per second for the elapsed time. Never blocks on the main thread.
+fn publish(app: &AppHandle, status: &Mutex<Status>, script: &Option<ScriptPayload>, mode: Highlight, snapshot: Snapshot) {
     let next = Status {
         state: snapshot.state,
         title: script.as_ref().map(|s| s.title.clone()).unwrap_or_default(),
-        elapsed: snapshot.elapsed,
+        elapsed: snapshot.elapsed.floor(),
         total: snapshot.total,
         highlight: mode,
     };
-    let mut current = lock(status);
-    if *current != next {
-        *current = next;
+    let changed = {
+        let mut current = lock(status);
+        if *current == next {
+            false
+        } else {
+            *current = next.clone();
+            true
+        }
+    };
+    if changed {
+        crate::tray::notify(app, next);
     }
 }
 

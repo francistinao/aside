@@ -16,7 +16,8 @@ tauri-build = { version = "2.7", features = [] }
 
 [dependencies]
 # macos-private-api: transparent windows on macOS need it, and so does tauri-nspanel.
-tauri = { version = "2.12", features = ["macos-private-api"] }
+# tray-icon: the menu bar extra and the Windows tray.
+tauri = { version = "2.12", features = ["macos-private-api", "tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"

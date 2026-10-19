@@ -247,23 +247,27 @@ impl SettingsState {
         Ok(after)
     }
 
-    /// Saves when something changed, then tells every window. The lock is released before
-    /// the emit so a listener's own settings call cannot wait on it.
+    /// Saves when something changed, then tells every window and the menu bar extra. The
+    /// lock is released before the emit so a listener's own settings call cannot wait on it.
     fn replace(&self, after: Settings) -> Result<()> {
-        let changed = {
+        let menu_changed = {
             let mut current = lock(&self.current);
             if *current == after {
-                false
+                None
             } else {
                 self.store.set(KEY, serde_json::to_value(&after)?);
                 self.store.save()?;
+                let menu_changed = crate::tray::shows(&current) != crate::tray::shows(&after);
                 *current = after.clone();
-                true
+                Some(menu_changed)
             }
         };
-        if changed {
+        if let Some(menu_changed) = menu_changed {
             for label in CHANGED_LISTENERS {
                 let _ = self.app.emit_to(label, CHANGED_EVENT, &after);
+            }
+            if menu_changed {
+                let _ = crate::tray::rebuild(&self.app);
             }
         }
         Ok(())

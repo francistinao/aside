@@ -158,12 +158,14 @@ fn popup(app: &AppHandle, menu: &Menu<tauri::Wry>, x: f64, y: f64) -> Result<()>
     Ok(())
 }
 
-/// Forwards any menu choice to the Library.
+/// Routes a menu choice: tray items are handled in Rust, the rest goes to the Library.
 pub fn handle(app: &AppHandle, event: MenuEvent) {
+    let id = event.id().as_ref().to_string();
+    if id.starts_with("tray.") {
+        let _ = crate::tray::on_action(app, &id);
+        return;
+    }
     let path = lock(&app.state::<MenuContext>().path).take();
-    let payload = ActionPayload {
-        id: event.id().as_ref().to_string(),
-        path,
-    };
+    let payload = ActionPayload { id, path };
     let _ = app.emit_to(prompter::LIBRARY, ACTION_EVENT, payload);
 }
