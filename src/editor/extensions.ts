@@ -6,6 +6,8 @@ import StarterKit from '@tiptap/starter-kit';
 import { OrderedList } from '@tiptap/extension-list';
 import { Markdown } from '@tiptap/markdown';
 import type { AnyExtension } from '@tiptap/core';
+import { LivePreview } from './livePreview';
+import { MetaLine } from './meta';
 import { Pause } from './pause';
 
 /// The stock ordered list tokenizer also accepts letter and roman markers, so a sentence
@@ -34,5 +36,7 @@ export function editorExtensions(): AnyExtension[] {
     DigitOrderedList,
     Markdown,
     Pause,
+    LivePreview,
+    MetaLine,
   ];
 }

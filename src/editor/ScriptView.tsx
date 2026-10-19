@@ -1,10 +1,14 @@
+import { invoke } from '@tauri-apps/api/core';
+import type { Editor } from '@tiptap/core';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { EditorContent, useEditor } from '@tiptap/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import { vault } from '../library/vault';
 import { createAutosave } from './autosave';
 import { editorExtensions } from './extensions';
 import { fidelityOf } from './markdown';
+import { formatEstimate } from './meta';
 import { PAUSE_CLICK_EVENT } from './pause';
 import type { PauseClick } from './pause';
 import { PausePopover } from './PausePopover';
@@ -12,10 +16,18 @@ import { ReadOnlyBanner } from './ReadOnlyBanner';
 import { Toolbar } from './Toolbar';
 import styles from './editor.module.css';
 
+const ESTIMATE_DELAY_MS = 300;
+
+interface Estimate {
+  words: number;
+  seconds: number;
+}
+
 interface Props {
   path: string;
   name: string;
   content: string;
+  wpm: number;
   onSaved: (modified: number) => void;
   onError: (reason: unknown) => void;
   onToggleSidebar: () => void;
@@ -32,13 +44,39 @@ interface PopoverState {
 
 /// One open script: its toolbar, editor and autosave. The parent keys it by path, so
 /// switching scripts unmounts this one (which flushes) and mounts a fresh one.
-export function ScriptView({ path, name, content, onSaved, onError, onToggleSidebar, flushRef }: Props) {
+export function ScriptView({ path, name, content, wpm, onSaved, onError, onToggleSidebar, flushRef }: Props) {
   const [readOnly, setReadOnly] = useState(false);
   const [popover, setPopover] = useState<PopoverState | null>(null);
   const container = useRef<HTMLDivElement | null>(null);
+  // Serialized once per document version, shared by the estimate and the save.
+  const serialized = useRef<{ doc: ProseMirrorNode; markdown: string } | null>(null);
+  const estimateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosave = useMemo(
     () => createAutosave((markdown) => vault.write(path, markdown).then((data) => onSaved(data.modified)), onError),
     [path, onSaved, onError],
+  );
+
+  const serialize = useCallback((current: Editor): string => {
+    if (serialized.current?.doc !== current.state.doc) {
+      serialized.current = { doc: current.state.doc, markdown: current.getMarkdown() };
+    }
+    return serialized.current.markdown;
+  }, []);
+
+  const requestEstimate = useCallback(
+    (current: Editor) => {
+      if (estimateTimer.current !== null) clearTimeout(estimateTimer.current);
+      estimateTimer.current = setTimeout(() => {
+        estimateTimer.current = null;
+        if (current.isDestroyed) return;
+        invoke<Estimate>('session_estimate', { markdown: serialize(current), wpm })
+          .then((estimate) => {
+            if (!current.isDestroyed) current.commands.setMetaLine(formatEstimate(estimate.words, estimate.seconds, wpm));
+          })
+          .catch(onError);
+      }, ESTIMATE_DELAY_MS);
+    },
+    [serialize, wpm, onError],
   );
 
   const editor = useEditor({
@@ -46,15 +84,24 @@ export function ScriptView({ path, name, content, onSaved, onError, onToggleSide
     content,
     contentType: 'markdown',
     editorProps: { attributes: { class: styles.prose ?? '', spellcheck: 'true' } },
-    onUpdate: ({ editor: current }) => autosave.schedule(current.getMarkdown()),
+    onUpdate: ({ editor: current }) => {
+      autosave.schedule(() => serialize(current));
+      requestEstimate(current);
+    },
     // The guard: a file the editor cannot reproduce opens read only, nothing is lost silently.
     onCreate: ({ editor: created }) => {
-      if (fidelityOf(content, created.getMarkdown()) === 'lossy') {
+      if (fidelityOf(content, serialize(created)) === 'lossy') {
         created.setEditable(false);
         setReadOnly(true);
       }
+      requestEstimate(created);
     },
   });
+
+  // A speed change re-estimates the open script.
+  useEffect(() => {
+    requestEstimate(editor);
+  }, [editor, requestEstimate]);
 
   useEffect(() => {
     flushRef.current = () => autosave.flush();
@@ -63,6 +110,7 @@ export function ScriptView({ path, name, content, onSaved, onError, onToggleSide
     return () => {
       window.removeEventListener('blur', onBlur);
       flushRef.current = null;
+      if (estimateTimer.current !== null) clearTimeout(estimateTimer.current);
       void autosave.flush();
     };
   }, [autosave, flushRef]);

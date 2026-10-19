@@ -17,9 +17,10 @@ import { useShortcuts } from './shell/useShortcuts';
 interface ShellSettings {
   sidebarWidth: number;
   sidebarVisible: boolean;
+  wpm: number;
 }
 
-const DEFAULT_SHELL: ShellSettings = { sidebarWidth: 240, sidebarVisible: true };
+const DEFAULT_SHELL: ShellSettings = { sidebarWidth: 240, sidebarVisible: true, wpm: 150 };
 
 interface MenuAction {
   id: string;
@@ -181,7 +182,7 @@ export function App() {
     let active = true;
     invoke<ShellSettings>('settings_get')
       .then((value) => {
-        if (active) setShell({ sidebarWidth: value.sidebarWidth, sidebarVisible: value.sidebarVisible });
+        if (active) setShell({ sidebarWidth: value.sidebarWidth, sidebarVisible: value.sidebarVisible, wpm: value.wpm });
       })
       .catch(report);
     return () => {
@@ -285,6 +286,7 @@ export function App() {
             path={openPath}
             name={scriptName(openPath)}
             content={shownFile.content}
+            wpm={shell.wpm}
             onSaved={saved}
             onError={report}
             onToggleSidebar={shortcuts.toggleSidebar}

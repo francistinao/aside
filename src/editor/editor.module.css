@@ -289,3 +289,16 @@
   font: var(--type-callout);
   color: var(--label);
 }
+
+/* Live Preview markers and the meta line are decorations the editor paints, never text. */
+.prose :global(.md-marker) {
+  color: var(--label-tertiary);
+  pointer-events: none;
+}
+
+.prose :global(.meta-line) {
+  margin: calc(-1 * var(--gap-8)) 0 var(--gap-24);
+  font: var(--type-callout);
+  color: var(--label-secondary);
+  user-select: none;
+}

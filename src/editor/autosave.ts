@@ -2,7 +2,8 @@
 // another script, window blur, close or quit. Nothing is written without a change.
 
 export interface Autosave {
-  schedule(content: string): void;
+  /// The producer runs when the save happens, so a keystroke never serializes the document.
+  schedule(produce: () => string): void;
   flush(): Promise<void>;
   cancel(): void;
   pending(): boolean;
@@ -16,14 +17,14 @@ export function createAutosave(
   delay = AUTOSAVE_DELAY_MS,
 ): Autosave {
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let pending: string | null = null;
+  let pending: (() => string) | null = null;
   let inflight: Promise<void> = Promise.resolve();
 
   function run(): Promise<void> {
     if (pending === null) return inflight;
-    const content = pending;
+    const produce = pending;
     pending = null;
-    inflight = inflight.then(() => save(content)).catch(onError);
+    inflight = inflight.then(() => save(produce())).catch(onError);
     return inflight;
   }
 
@@ -33,8 +34,8 @@ export function createAutosave(
   }
 
   return {
-    schedule(content) {
-      pending = content;
+    schedule(produce) {
+      pending = produce;
       clearTimer();
       timer = setTimeout(() => {
         timer = null;

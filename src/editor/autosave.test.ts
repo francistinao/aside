@@ -8,9 +8,9 @@ describe('createAutosave', () => {
   it('saves once, 500 ms after the last change', async () => {
     const save = vi.fn(() => Promise.resolve());
     const autosave = createAutosave(save, () => undefined);
-    autosave.schedule('a');
+    autosave.schedule(() => 'a');
     await vi.advanceTimersByTimeAsync(300);
-    autosave.schedule('ab');
+    autosave.schedule(() => 'ab');
     await vi.advanceTimersByTimeAsync(499);
     expect(save).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
@@ -23,7 +23,7 @@ describe('createAutosave', () => {
     const autosave = createAutosave(save, () => undefined);
     await autosave.flush();
     expect(save).not.toHaveBeenCalled();
-    autosave.schedule('x');
+    autosave.schedule(() => 'x');
     await autosave.flush();
     expect(save).toHaveBeenCalledWith('x');
     await vi.advanceTimersByTimeAsync(1000);
@@ -33,7 +33,7 @@ describe('createAutosave', () => {
   it('cancel drops the pending change', async () => {
     const save = vi.fn(() => Promise.resolve());
     const autosave = createAutosave(save, () => undefined);
-    autosave.schedule('gone');
+    autosave.schedule(() => 'gone');
     autosave.cancel();
     await vi.advanceTimersByTimeAsync(1000);
     expect(save).not.toHaveBeenCalled();
@@ -44,10 +44,10 @@ describe('createAutosave', () => {
     const errors: unknown[] = [];
     const save = vi.fn((content: string) => (content === 'bad' ? Promise.reject(new Error('disk')) : Promise.resolve()));
     const autosave = createAutosave(save, (reason) => errors.push(reason));
-    autosave.schedule('bad');
+    autosave.schedule(() => 'bad');
     await autosave.flush();
     expect(errors).toHaveLength(1);
-    autosave.schedule('good');
+    autosave.schedule(() => 'good');
     await autosave.flush();
     expect(save).toHaveBeenLastCalledWith('good');
   });
