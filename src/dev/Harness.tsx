@@ -70,6 +70,12 @@ export function Harness() {
   useEffect(() => {
     let active = true;
     const unlisten: (() => void)[] = [];
+    // Listeners register asynchronously. If the effect was already cleaned up (StrictMode,
+    // HMR) by the time one resolves, stop it at once instead of leaking a duplicate.
+    const keep = (stop: () => void) => {
+      if (active) unlisten.push(stop);
+      else stop();
+    };
     invoke<Settings>('settings_get')
       .then((value) => {
         if (active) setSettings(value);
@@ -82,14 +88,12 @@ export function Harness() {
         setStartLatency(performance.now() - startedAt.current);
         startedAt.current = null;
       }
-    }).then((stop) => unlisten.push(stop));
+    }).then(keep);
     void listen<Position>('session://position', (event) => {
       eventCount.current += 1;
       setPosition(event.payload);
-    }).then((stop) => unlisten.push(stop));
-    void listen<CaptureStatus>('capture://status', (event) => setCapture(event.payload)).then((stop) =>
-      unlisten.push(stop),
-    );
+    }).then(keep);
+    void listen<CaptureStatus>('capture://status', (event) => setCapture(event.payload)).then(keep);
     const counter = setInterval(() => {
       setEventsPerSecond(eventCount.current);
       eventCount.current = 0;
@@ -225,6 +229,14 @@ export function Harness() {
               <option value="medium">Medium</option>
               <option value="large">Large</option>
             </select>
+          </label>
+          <label className={styles.control}>
+            <input
+              type="checkbox"
+              checked={settings.hideFromCapture}
+              onChange={(event) => change({ hideFromCapture: event.target.checked })}
+            />
+            Hide from screen sharing
           </label>
           <span className={styles.value}>{settings.wpm} wpm</span>
         </div>
