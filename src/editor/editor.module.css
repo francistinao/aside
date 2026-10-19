@@ -41,8 +41,65 @@
   text-overflow: ellipsis;
 }
 
+.spacer {
+  flex: 1;
+  align-self: stretch;
+}
+
+/* Related buttons share one glass capsule. */
+.capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-2);
+  height: var(--control-large);
+  padding: 0 var(--gap-2);
+  border: var(--glass-border);
+  border-radius: calc(var(--control-large) / 2);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-highlight);
+}
+
+.capsuleButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-6);
+  height: var(--control-regular);
+  min-width: var(--control-regular);
+  padding: 0 var(--gap-8);
+  border: 0;
+  border-radius: calc(var(--control-regular) / 2);
+  background: transparent;
+  color: var(--label-secondary);
+  font: var(--type-body);
+  transition: background var(--duration-press) linear;
+}
+
+.capsuleButton:hover {
+  background: var(--fill-hover);
+}
+
+.capsuleButton:active,
+.capsuleButton[aria-pressed="true"] {
+  background: var(--fill-pressed);
+  color: var(--label);
+}
+
+.capsuleButton:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
 /* The writing column. Bottom padding keeps the last line above the floating control bar. */
 .editor {
+  position: relative;
   max-width: var(--writing-column);
   margin: 0 auto;
   padding: var(--gap-48) var(--gap-24) calc(var(--bottom-bar-height) + var(--bottom-bar-inset) + var(--gap-24));
@@ -167,4 +224,68 @@
 
 .prose :global(s) {
   color: var(--label-secondary);
+}
+
+/* The pause chip, from docs/DESIGN.md. ProseMirror owns this DOM, so the class is global. */
+.prose :global(.pause-chip) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-4);
+  height: 18px;
+  padding: 0 var(--gap-8);
+  margin: 0 var(--gap-2);
+  border-radius: 9px;
+  background: var(--fill);
+  vertical-align: middle;
+  font: var(--type-subheadline);
+  font-weight: 500;
+  color: var(--label);
+  user-select: none;
+  cursor: default;
+}
+
+.prose :global(.pause-chip.ProseMirror-selectednode) {
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.popover {
+  position: absolute;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-4);
+  padding: var(--gap-4);
+  border: var(--glass-border);
+  border-radius: var(--radius-popover);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
+}
+
+.stepButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-regular);
+  height: var(--control-regular);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--fill);
+  color: var(--label);
+}
+
+.stepButton:disabled {
+  color: var(--label-quaternary);
+}
+
+.stepButton:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+.stepValue {
+  min-width: 48px;
+  text-align: center;
+  font: var(--type-callout);
+  color: var(--label);
 }

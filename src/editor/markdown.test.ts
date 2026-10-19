@@ -40,6 +40,16 @@ describe('markdown round trip', () => {
   });
 });
 
+describe('ordered lists', () => {
+  it('start with digits only, so short words before a period stay text', () => {
+    expect(roundTrip('Go. Now click the cog.').trimEnd()).toBe('Go. Now click the cog.');
+    expect(roundTrip('Hi. There').trimEnd()).toBe('Hi. There');
+    expect(roundTrip('iv. Four').trimEnd()).toBe('iv. Four');
+    expect(roundTrip('1. One\n2. Two').trimEnd()).toBe('1. One\n2. Two');
+    expect(roundTrip('3) Three').trimEnd()).toBe('3. Three');
+  });
+});
+
 describe('sameMarkdown', () => {
   it('ignores style only differences', () => {
     expect(sameMarkdown('Title\n=====\n\nSome _italic_ and __bold__ text.', '# Title\n\nSome *italic* and **bold** text.')).toBe(true);

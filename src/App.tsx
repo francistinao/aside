@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styles from './App.module.css';
-import { Editor } from './editor/Editor';
+import { ScriptView } from './editor/ScriptView';
 import { Toolbar } from './editor/Toolbar';
 import { EmptyLibrary } from './library/EmptyLibrary';
 import { FolderScreen } from './library/FolderScreen';
@@ -248,6 +248,7 @@ export function App() {
   const width = shell.sidebarVisible ? shell.sidebarWidth : 0;
   const folderProblem = library.phase === 'noFolder' || library.phase === 'missing';
   const noScripts = library.phase === 'ready' && !library.tree?.entries.some((entry) => entry.kind === 'script');
+  const showScript = !folderProblem && !noScripts && openPath !== null;
 
   return (
     <div className={styles.shell} style={{ '--sidebar-width': `${width}px` } as React.CSSProperties}>
@@ -278,15 +279,27 @@ export function App() {
         )}
       </aside>
       <main className={styles.main}>
-        <Toolbar name={openPath === null || noScripts ? null : scriptName(openPath)} onToggleSidebar={shortcuts.toggleSidebar} />
-        <section className={styles.content}>
-          {folderProblem && <FolderScreen missing={library.phase === 'missing'} onChoose={() => void library.chooseFolder()} />}
-          {noScripts && <EmptyLibrary onNewScript={newScript} />}
-          {!folderProblem && !noScripts && openPath !== null && shownFile !== null && (
-            <Editor key={openPath} path={openPath} content={shownFile.content} onSaved={saved} onError={report} flushRef={flushRef} />
-          )}
-          {(error ?? library.error) !== null && !folderProblem && <p className={styles.error}>{error ?? library.error}</p>}
-        </section>
+        {showScript && openPath !== null && shownFile !== null ? (
+          <ScriptView
+            key={openPath}
+            path={openPath}
+            name={scriptName(openPath)}
+            content={shownFile.content}
+            onSaved={saved}
+            onError={report}
+            onToggleSidebar={shortcuts.toggleSidebar}
+            flushRef={flushRef}
+          />
+        ) : (
+          <>
+            <Toolbar editor={null} name={null} onToggleSidebar={shortcuts.toggleSidebar} />
+            <section className={styles.content}>
+              {folderProblem && <FolderScreen missing={library.phase === 'missing'} onChoose={() => void library.chooseFolder()} />}
+              {noScripts && <EmptyLibrary onNewScript={newScript} />}
+            </section>
+          </>
+        )}
+        {(error ?? library.error) !== null && !folderProblem && <p className={styles.error}>{error ?? library.error}</p>}
       </main>
     </div>
   );
