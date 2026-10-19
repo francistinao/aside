@@ -48,6 +48,39 @@
   padding: var(--gap-48) var(--gap-24) calc(var(--bottom-bar-height) + var(--bottom-bar-inset) + var(--gap-24));
 }
 
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-12);
+  margin: 0 0 var(--gap-24);
+  padding: var(--gap-8) var(--gap-12);
+  border-radius: var(--radius-field);
+  background: var(--fill);
+  font: var(--type-body);
+  color: var(--label-secondary);
+}
+
+.bannerButton {
+  flex: none;
+  height: var(--control-regular);
+  padding: 0 var(--gap-12);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--fill-hover);
+  color: var(--label);
+  font: var(--type-body);
+}
+
+.bannerButton:active {
+  background: var(--fill-pressed);
+}
+
+.bannerButton:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 0;
+}
+
 .prose {
   outline: none;
   font: var(--type-editor-body);
