@@ -3,6 +3,7 @@ pub mod error;
 pub mod follow;
 pub mod lock;
 pub mod prompter;
+pub mod session;
 
 use tauri::webview::PageLoadEvent;
 use tauri::{Emitter, Manager, State};
