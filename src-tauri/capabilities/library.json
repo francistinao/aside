@@ -13,6 +13,8 @@
     "allow-vault-tree",
     "allow-vault-reveal",
     "allow-vault-search",
+    "allow-library-pin",
+    "allow-library-context-menu",
     "allow-vault-read",
     "allow-vault-write",
     "allow-vault-create",

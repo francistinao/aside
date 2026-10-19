@@ -2,6 +2,7 @@ pub mod capture;
 pub mod error;
 pub mod follow;
 pub mod lock;
+pub mod menu;
 pub mod prompter;
 pub mod session;
 pub mod settings;
@@ -16,7 +17,7 @@ use session::tokenize::tokenize;
 use session::{Action, Control, ScriptPayload, SessionHandle};
 use settings::{Settings, SettingsPatch, SettingsState};
 use vault::index::Hit;
-use vault::{ChosenFolder, Entry, FileData, Vault, VaultStatus};
+use vault::{ChosenFolder, FileData, Tree, Vault, VaultStatus};
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -93,8 +94,29 @@ async fn vault_choose_folder(app: AppHandle) -> error::Result<Option<ChosenFolde
 }
 
 #[tauri::command]
-fn vault_tree(vault: State<'_, Vault>) -> error::Result<Vec<Entry>> {
-    vault.entries()
+fn vault_tree(vault: State<'_, Vault>, settings: State<'_, SettingsState>) -> error::Result<Tree> {
+    vault.tree(&settings)
+}
+
+#[tauri::command]
+fn library_pin(
+    vault: State<'_, Vault>,
+    settings: State<'_, SettingsState>,
+    path: String,
+    pinned: bool,
+) -> error::Result<Vec<String>> {
+    vault.set_pinned(&settings, &path, pinned)
+}
+
+#[tauri::command]
+fn library_context_menu(
+    app: AppHandle,
+    path: String,
+    target: menu::ContextTarget,
+    x: f64,
+    y: f64,
+) -> error::Result<()> {
+    menu::context_menu(&app, path, target, x, y)
 }
 
 #[tauri::command]
@@ -107,9 +129,16 @@ fn vault_search(vault: State<'_, Vault>, query: String) -> Vec<Hit> {
     vault.search(&query)
 }
 
+/// Opening a script records it in recents. It never touches the file.
 #[tauri::command]
-fn vault_read(vault: State<'_, Vault>, path: String) -> error::Result<FileData> {
-    vault.read(&path)
+fn vault_read(
+    vault: State<'_, Vault>,
+    settings: State<'_, SettingsState>,
+    path: String,
+) -> error::Result<FileData> {
+    let data = vault.read(&path)?;
+    vault.record_recent(&settings, &path)?;
+    Ok(data)
 }
 
 #[tauri::command]
@@ -188,6 +217,8 @@ pub fn run() {
         vault_tree,
         vault_reveal,
         vault_search,
+        library_pin,
+        library_context_menu,
         vault_read,
         vault_write,
         vault_create,
@@ -211,6 +242,8 @@ pub fn run() {
         vault_tree,
         vault_reveal,
         vault_search,
+        library_pin,
+        library_context_menu,
         vault_read,
         vault_write,
         vault_create,
@@ -224,6 +257,8 @@ pub fn run() {
     ]);
     builder
         .manage(prompter::Prompter::default())
+        .manage(menu::MenuContext::default())
+        .on_menu_event(menu::handle)
         .setup(|app| {
             // Settings are read before anything can show, so nothing flashes a default.
             let settings = SettingsState::load(app.handle())?;

@@ -10,6 +10,8 @@ fn main() {
         "vault_tree",
         "vault_reveal",
         "vault_search",
+        "library_pin",
+        "library_context_menu",
         "vault_read",
         "vault_write",
         "vault_create",

@@ -12,13 +12,13 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::error::{Error, Result};
 use crate::lock::lock;
-use crate::settings::SettingsState;
+use crate::settings::{MAX_RECENTS, SettingsState};
 use index::{Hit, Index};
 
 const SCRIPT_EXT: &str = "md";
@@ -30,7 +30,7 @@ const SAMPLE_SCRIPT: &str = include_str!("../../../assets/sample-script.md");
 /// How long after our own write the watcher may still see it echo back.
 const OWN_WRITE_WINDOW: Duration = Duration::from_secs(2);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum EntryKind {
     Folder,
@@ -54,6 +54,16 @@ pub struct Entry {
 pub struct FileData {
     pub content: String,
     pub modified: u64,
+}
+
+/// The whole sidebar in one call. Pins and recents only name scripts that still exist.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Tree {
+    pub root: String,
+    pub entries: Vec<Entry>,
+    pub pins: Vec<String>,
+    pub recents: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -140,6 +150,47 @@ impl Vault {
 
     pub fn search(&self, query: &str) -> Vec<Hit> {
         lock(&self.index).search(query)
+    }
+
+    /// Entries plus pins and recents. Lists that lost files are saved back quietly.
+    pub fn tree(&self, settings: &SettingsState) -> Result<Tree> {
+        let root = self.root()?;
+        let entries = self.entries()?;
+        let scripts: Vec<&str> = entries
+            .iter()
+            .filter(|e| e.kind == EntryKind::Script)
+            .map(|e| e.path.as_str())
+            .collect();
+        let current = settings.get();
+        let pins = prune(&current.pins, &scripts);
+        let recents = prune(&current.recents, &scripts);
+        if pins != current.pins || recents != current.recents {
+            settings.modify(|s| {
+                s.pins = pins.clone();
+                s.recents = recents.clone();
+            })?;
+        }
+        Ok(Tree {
+            root: root.to_string_lossy().into_owned(),
+            entries,
+            pins,
+            recents,
+        })
+    }
+
+    pub fn record_recent(&self, settings: &SettingsState, relative: &str) -> Result<()> {
+        settings.modify(|s| s.recents = push_recent(&s.recents, relative))?;
+        Ok(())
+    }
+
+    pub fn set_pinned(&self, settings: &SettingsState, relative: &str, pinned: bool) -> Result<Vec<String>> {
+        let after = settings.modify(|s| {
+            s.pins.retain(|p| p != relative);
+            if pinned {
+                s.pins.push(relative.to_string());
+            }
+        })?;
+        Ok(after.pins)
     }
 
     pub fn set_root(&self, root: Option<PathBuf>) {
@@ -366,6 +417,23 @@ fn walk(root: &Path, dir: &Path, out: &mut Vec<Entry>) -> Result<()> {
     Ok(())
 }
 
+/// Keeps only the paths that still exist, in their order.
+pub fn prune(list: &[String], existing: &[&str]) -> Vec<String> {
+    list.iter()
+        .filter(|p| existing.contains(&p.as_str()))
+        .cloned()
+        .collect()
+}
+
+/// Moves `path` to the front and keeps the list at the recents limit.
+pub fn push_recent(list: &[String], path: &str) -> Vec<String> {
+    let mut out = Vec::with_capacity(MAX_RECENTS);
+    out.push(path.to_string());
+    out.extend(list.iter().filter(|p| p.as_str() != path).cloned());
+    out.truncate(MAX_RECENTS);
+    out
+}
+
 fn join_relative(dir: &str, name: &str) -> String {
     if dir.is_empty() || dir == "." {
         name.to_string()
@@ -501,6 +569,20 @@ mod tests {
         vault.trash("gone.md").expect("trash");
         assert!(!dir.path().join("gone.md").exists());
         assert!(matches!(vault.trash("../outside.md"), Err(Error::OutsideVault)));
+    }
+
+    #[test]
+    fn pins_and_recents_drop_missing_files_and_stay_ordered() {
+        let list = vec!["a.md".to_string(), "gone.md".to_string(), "b.md".to_string()];
+        assert_eq!(prune(&list, &["b.md", "a.md"]), vec!["a.md", "b.md"]);
+        let mut recents: Vec<String> = (0..MAX_RECENTS).map(|i| format!("r{i}.md")).collect();
+        recents = push_recent(&recents, "new.md");
+        assert_eq!(recents.len(), MAX_RECENTS);
+        assert_eq!(recents[0], "new.md");
+        assert!(!recents.contains(&"r9.md".to_string()), "the oldest fell off");
+        let again = push_recent(&recents, "r3.md");
+        assert_eq!(again[0], "r3.md");
+        assert_eq!(again.iter().filter(|p| *p == "r3.md").count(), 1);
     }
 
     #[test]
