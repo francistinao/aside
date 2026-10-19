@@ -13,6 +13,7 @@ fn main() {
         "library_pin",
         "library_context_menu",
         "platform_info",
+        "library_flushed",
         "vault_read",
         "vault_write",
         "vault_create",

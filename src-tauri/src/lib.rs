@@ -8,9 +8,11 @@ pub mod session;
 pub mod settings;
 pub mod vault;
 
-use serde::Serialize;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use serde::{Deserialize, Serialize};
 use tauri::webview::PageLoadEvent;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WindowEvent};
 
 use session::engine::{Estimate, estimate};
 use session::tokenize::tokenize;
@@ -193,6 +195,48 @@ fn vault_trash(vault: State<'_, Vault>, path: String) -> error::Result<()> {
     vault.trash(&path)
 }
 
+pub const FLUSH_EVENT: &str = "library://flush";
+
+/// Why the Library was asked to save: the window is closing or the app is quitting.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FlushReason {
+    Close,
+    Quit,
+}
+
+#[derive(Clone, Copy, Serialize)]
+struct FlushPayload {
+    then: FlushReason,
+}
+
+/// Set once the Library has saved and the exit may proceed.
+#[derive(Default)]
+pub struct Quitting(AtomicBool);
+
+fn ask_to_flush(app: &AppHandle, then: FlushReason) {
+    if app.emit_to(prompter::LIBRARY, FLUSH_EVENT, FlushPayload { then }).is_err() {
+        finish_flush(app, then);
+    }
+}
+
+/// Close Window hides the Library on macOS and keeps the app in the Dock. On Windows the
+/// window is the app, so closing it quits.
+fn finish_flush(app: &AppHandle, then: FlushReason) {
+    let quit = then == FlushReason::Quit || !cfg!(target_os = "macos");
+    if quit {
+        app.state::<Quitting>().0.store(true, Ordering::SeqCst);
+        app.exit(0);
+    } else if let Some(window) = app.get_webview_window(prompter::LIBRARY) {
+        let _ = window.hide();
+    }
+}
+
+#[tauri::command]
+fn library_flushed(app: AppHandle, then: FlushReason) {
+    finish_flush(&app, then);
+}
+
 #[tauri::command]
 fn settings_get(settings: State<'_, SettingsState>) -> Settings {
     settings.get()
@@ -252,6 +296,7 @@ pub fn run() {
         library_pin,
         library_context_menu,
         platform_info,
+        library_flushed,
         vault_read,
         vault_write,
         vault_create,
@@ -278,6 +323,7 @@ pub fn run() {
         library_pin,
         library_context_menu,
         platform_info,
+        library_flushed,
         vault_read,
         vault_write,
         vault_create,
@@ -292,7 +338,16 @@ pub fn run() {
     builder
         .manage(prompter::Prompter::default())
         .manage(menu::MenuContext::default())
+        .manage(Quitting::default())
         .on_menu_event(menu::handle)
+        .on_window_event(|window, event| {
+            if window.label() == prompter::LIBRARY
+                && let WindowEvent::CloseRequested { api, .. } = event
+            {
+                api.prevent_close();
+                ask_to_flush(window.app_handle(), FlushReason::Close);
+            }
+        })
         .setup(|app| {
             // Settings are read before anything can show, so nothing flashes a default.
             let settings = SettingsState::load(app.handle())?;
@@ -315,6 +370,23 @@ pub fn run() {
                 webview.state::<SessionHandle>().send(Control::Resend);
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| match event {
+            // A quit the user asked for waits until the Library has saved.
+            RunEvent::ExitRequested { api, code, .. } => {
+                if code.is_none() && !app.state::<Quitting>().0.load(Ordering::SeqCst) {
+                    api.prevent_exit();
+                    ask_to_flush(app, FlushReason::Quit);
+                }
+            }
+            #[cfg(target_os = "macos")]
+            RunEvent::Reopen { .. } => {
+                if let Some(window) = app.get_webview_window(prompter::LIBRARY) {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+            _ => {}
+        });
 }

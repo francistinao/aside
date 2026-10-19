@@ -2,6 +2,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styles from './App.module.css';
+import { Editor } from './editor/Editor';
+import { Toolbar } from './editor/Toolbar';
 import { EmptyLibrary } from './library/EmptyLibrary';
 import { FolderScreen } from './library/FolderScreen';
 import { Sidebar } from './library/Sidebar';
@@ -24,15 +26,12 @@ interface MenuAction {
   path?: string;
 }
 
-/// Checkpoint stand-in for the editor: the open script, read only. Replaced in Part C.
-function Preview({ path, file }: { path: string; file: FileData | null }) {
-  const name = path.split('/').pop()?.replace(/\.md$/, '') ?? path;
-  return (
-    <div className={styles.preview}>
-      <h1 className={styles.previewTitle}>{name}</h1>
-      <pre className={styles.previewBody}>{file?.content ?? ''}</pre>
-    </div>
-  );
+interface FlushRequest {
+  then: 'close' | 'quit';
+}
+
+function scriptName(path: string): string {
+  return path.split('/').pop()?.replace(/\.md$/, '') ?? path;
 }
 
 export function App() {
@@ -46,6 +45,7 @@ export function App() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [file, setFile] = useState<{ path: string; data: FileData } | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
+  const flushRef = useRef<(() => Promise<void>) | null>(null);
   const library = useVault();
   const { open, openPath, refresh, createScript, createFolder } = library;
   const report = useCallback((reason: unknown) => setError(describeError(reason)), []);
@@ -65,6 +65,27 @@ export function App() {
     };
   }, [openPath, library.tree, report]);
   const shownFile = file !== null && file.path === openPath ? file.data : null;
+
+  const saved = useCallback((modified: number) => {
+    setFile((current) => (current === null ? current : { ...current, data: { ...current.data, modified } }));
+  }, []);
+
+  // Rust asks for a flush before the window closes or the app quits, then finishes the job.
+  useEffect(() => {
+    let active = true;
+    let stop: (() => void) | null = null;
+    void listen<FlushRequest>('library://flush', (event) => {
+      const flush = flushRef.current?.() ?? Promise.resolve();
+      void flush.finally(() => invoke('library_flushed', { then: event.payload.then }).catch(report));
+    }).then((unlisten) => {
+      if (active) stop = unlisten;
+      else unlisten();
+    });
+    return () => {
+      active = false;
+      stop?.();
+    };
+  }, [report]);
 
   /// Opening from the sidebar selects the row and reveals its folders.
   const openScript = useCallback(
@@ -257,11 +278,13 @@ export function App() {
         )}
       </aside>
       <main className={styles.main}>
-        <header className={styles.toolbar} data-tauri-drag-region />
+        <Toolbar name={openPath === null || noScripts ? null : scriptName(openPath)} onToggleSidebar={shortcuts.toggleSidebar} />
         <section className={styles.content}>
           {folderProblem && <FolderScreen missing={library.phase === 'missing'} onChoose={() => void library.chooseFolder()} />}
           {noScripts && <EmptyLibrary onNewScript={newScript} />}
-          {!folderProblem && !noScripts && openPath !== null && <Preview path={openPath} file={shownFile} />}
+          {!folderProblem && !noScripts && openPath !== null && shownFile !== null && (
+            <Editor key={openPath} path={openPath} content={shownFile.content} onSaved={saved} onError={report} flushRef={flushRef} />
+          )}
           {(error ?? library.error) !== null && !folderProblem && <p className={styles.error}>{error ?? library.error}</p>}
         </section>
       </main>

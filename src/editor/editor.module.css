@@ -1,0 +1,137 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-12);
+  flex: none;
+  height: var(--toolbar-height);
+  padding: 0 var(--gap-16);
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit-target);
+  height: var(--hit-target);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--label-secondary);
+  transition: background var(--duration-press) linear;
+}
+
+.iconButton:hover {
+  background: var(--fill-hover);
+}
+
+.iconButton:active {
+  background: var(--fill-pressed);
+}
+
+.iconButton:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+.title {
+  font: var(--type-headline);
+  color: var(--label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The writing column. Bottom padding keeps the last line above the floating control bar. */
+.editor {
+  max-width: var(--writing-column);
+  margin: 0 auto;
+  padding: var(--gap-48) var(--gap-24) calc(var(--bottom-bar-height) + var(--bottom-bar-inset) + var(--gap-24));
+}
+
+.prose {
+  outline: none;
+  font: var(--type-editor-body);
+  color: var(--label);
+  user-select: text;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.prose :global(p) {
+  margin: 0 0 var(--gap-16);
+}
+
+.prose :global(h1) {
+  margin: 0 0 var(--gap-16);
+  font: var(--type-editor-h1);
+}
+
+.prose :global(h2) {
+  margin: var(--gap-24) 0 var(--gap-12);
+  font: var(--type-editor-h2);
+}
+
+.prose :global(h3) {
+  margin: var(--gap-20) 0 var(--gap-8);
+  font: var(--type-editor-h3);
+}
+
+.prose :global(ul),
+.prose :global(ol) {
+  margin: 0 0 var(--gap-16);
+  padding-left: var(--gap-24);
+}
+
+.prose :global(li) > :global(p) {
+  margin: 0;
+}
+
+.prose :global(strong) {
+  font-weight: 700;
+}
+
+.prose :global(a) {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.prose :global(code) {
+  padding: var(--gap-2) var(--gap-4);
+  border-radius: var(--radius-control);
+  background: var(--fill);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.9em;
+}
+
+.prose :global(pre) {
+  margin: 0 0 var(--gap-16);
+  padding: var(--gap-12);
+  border-radius: var(--radius-field);
+  background: var(--fill);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+.prose :global(pre) :global(code) {
+  padding: 0;
+  background: transparent;
+  font-size: inherit;
+}
+
+.prose :global(blockquote) {
+  margin: 0 0 var(--gap-16);
+  padding-left: var(--gap-16);
+  border-left: 2px solid var(--separator);
+  color: var(--label-secondary);
+}
+
+.prose :global(hr) {
+  margin: var(--gap-24) 0;
+  border: 0;
+  border-top: 1px solid var(--separator);
+}
+
+.prose :global(s) {
+  color: var(--label-secondary);
+}
