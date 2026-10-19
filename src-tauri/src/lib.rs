@@ -419,7 +419,8 @@ pub fn run() {
                 .build(),
         )
         // Shortcuts are registered at Start, so a taken key never stops the app from launching.
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build());
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None));
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
     #[cfg(debug_assertions)]

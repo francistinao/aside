@@ -25,13 +25,14 @@ export interface Settings {
   peekKey: PeekKey;
   fadeWhileClicking: boolean;
   shortcuts: Record<ShortcutAction, string>;
+  openAtLogin: boolean;
   scriptsFolder: string | null;
   sidebarWidth: number;
   sidebarVisible: boolean;
 }
 
 export type SettingsPatch = Partial<
-  Pick<Settings, 'textSize' | 'hideFromCapture' | 'follow' | 'distance' | 'flipAtEdges' | 'peekKey' | 'fadeWhileClicking'>
+  Pick<Settings, 'textSize' | 'hideFromCapture' | 'follow' | 'distance' | 'flipAtEdges' | 'peekKey' | 'fadeWhileClicking' | 'openAtLogin'>
 >;
 
 export interface ShortcutFailure {

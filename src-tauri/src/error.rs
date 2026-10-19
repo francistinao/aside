@@ -38,6 +38,8 @@ pub enum Error {
     BadShortcut,
     #[error(transparent)]
     Shortcut(#[from] tauri_plugin_global_shortcut::Error),
+    #[error("Couldn't change Open at login. {0}")]
+    Autostart(#[from] tauri_plugin_autostart::Error),
 }
 
 impl Serialize for Error {

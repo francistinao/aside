@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, Wry};
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_store::{Store, StoreExt};
 
 use crate::error::Result;
@@ -59,6 +60,8 @@ pub struct Settings {
     pub fade_while_clicking: bool,
     /// Accelerator per action, changed through the shortcuts commands.
     pub shortcuts: Shortcuts,
+    /// Mirrors the OS login item. Synced from the autostart plugin at launch.
+    pub open_at_login: bool,
     /// Absolute path of the scripts folder, None before first run.
     pub scripts_folder: Option<String>,
     /// Relative paths inside the scripts folder.
@@ -85,6 +88,7 @@ impl Default for Settings {
             peek_key: PeekKey::Control,
             fade_while_clicking: false,
             shortcuts: shortcuts::defaults(),
+            open_at_login: false,
             scripts_folder: None,
             pins: Vec::new(),
             recents: Vec::new(),
@@ -111,6 +115,7 @@ pub struct SettingsPatch {
     pub flip_at_edges: Option<bool>,
     pub peek_key: Option<PeekKey>,
     pub fade_while_clicking: Option<bool>,
+    pub open_at_login: Option<bool>,
     pub sidebar_width: Option<u32>,
     pub sidebar_visible: Option<bool>,
     pub capture_notice_shown: Option<bool>,
@@ -150,6 +155,9 @@ impl Settings {
         }
         if let Some(v) = patch.fade_while_clicking {
             self.fade_while_clicking = v;
+        }
+        if let Some(v) = patch.open_at_login {
+            self.open_at_login = v;
         }
         if let Some(v) = patch.sidebar_width {
             self.sidebar_width = v;
@@ -211,14 +219,18 @@ pub struct SettingsState {
 }
 
 impl SettingsState {
-    /// Reads the store once. Missing or malformed values fall back to the defaults.
+    /// Reads the store once. Missing or malformed values fall back to the defaults. Open at
+    /// login comes from the OS, since the user can change it in System Settings too.
     pub fn load(app: &AppHandle) -> Result<Self> {
         let store = app.store(FILE)?;
-        let current = store
+        let mut current = store
             .get(KEY)
             .and_then(|value| serde_json::from_value::<Settings>(value).ok())
             .unwrap_or_default()
             .normalized();
+        if let Ok(enabled) = app.autolaunch().is_enabled() {
+            current.open_at_login = enabled;
+        }
         Ok(Self {
             current: Mutex::new(current),
             store,
@@ -294,6 +306,14 @@ pub fn apply(app: &AppHandle, before: &Settings, after: &Settings) -> Result<()>
     }
     if after.peek_key != before.peek_key || after.fade_while_clicking != before.fade_while_clicking {
         prompter::set_peek(app, after.peek_key, after.fade_while_clicking);
+    }
+    if after.open_at_login != before.open_at_login {
+        let launch = app.autolaunch();
+        if after.open_at_login {
+            launch.enable()?;
+        } else {
+            launch.disable()?;
+        }
     }
     if StylePayload::from(after) != StylePayload::from(before) {
         emit_style(app, after)?;
@@ -373,6 +393,7 @@ mod tests {
         assert_eq!(json["flipAtEdges"], true);
         assert_eq!(json["peekKey"], "control");
         assert_eq!(json["fadeWhileClicking"], false);
+        assert_eq!(json["openAtLogin"], false);
         assert_eq!(json["shortcuts"]["pause"], "Control+Alt+Space");
         let back: Settings = serde_json::from_value(json).expect("deserialize");
         assert_eq!(back, Settings::default());

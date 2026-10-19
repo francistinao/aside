@@ -40,6 +40,8 @@ notify-debouncer-full = "0.7"
 tauri-plugin-window-state = "2.5"
 # The global shortcuts from docs/PRODUCT.md, registered only while a session runs. Rust only.
 tauri-plugin-global-shortcut = "2.4"
+# Open at login: a LaunchAgent on macOS, a Run key on Windows. No signing involved.
+tauri-plugin-autostart = "2.7"
 
 [dev-dependencies]
 # Temp folders for the vault tests.

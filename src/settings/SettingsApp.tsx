@@ -60,7 +60,7 @@ export function SettingsApp() {
         <Segmented value={tab} label="Settings tabs" options={TABS} onChange={setTab} />
       </div>
       <div className={styles.content}>
-        {settings !== null && tab === 'general' && <GeneralTab settings={settings} onError={report} />}
+        {settings !== null && tab === 'general' && <GeneralTab settings={settings} onPatch={patch} onError={report} />}
         {settings !== null && tab === 'prompter' && <PrompterTab settings={settings} onPatch={patch} />}
         {settings !== null && tab === 'shortcuts' && <ShortcutsTab settings={settings} status={shortcuts} onError={report} />}
         {settings !== null && tab === 'privacy' && <PrivacyTab settings={settings} capture={capture} onPatch={patch} />}
