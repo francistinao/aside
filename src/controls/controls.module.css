@@ -1,0 +1,245 @@
+/* The bottom control bar and its controls. Values from docs/DESIGN.md through tokens.css. */
+
+.bar {
+  container-type: inline-size;
+  position: absolute;
+  left: var(--gap-12);
+  right: var(--gap-12);
+  bottom: var(--bottom-bar-inset);
+  display: flex;
+  align-items: center;
+  gap: var(--gap-8);
+  height: var(--bottom-bar-height);
+  padding: 0 var(--gap-12);
+  border: var(--glass-border);
+  border-radius: var(--radius-bottom-bar);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .bar {
+    background: var(--bg-elevated);
+    backdrop-filter: none;
+  }
+}
+
+.group {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--gap-4);
+}
+
+/* The slider groups give way first when the column is narrow. */
+.flexible {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.label {
+  font: var(--type-callout);
+  color: var(--label-secondary);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.control {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-8);
+  min-width: 0;
+  height: var(--control-regular);
+}
+
+.value {
+  min-width: 56px;
+  font: var(--type-callout);
+  color: var(--label-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A hairline with 2 px margins: about 20 px between groups once the 8 px gaps are added. */
+.divider {
+  flex: none;
+  width: 1px;
+  height: var(--control-large);
+  margin: 0 var(--gap-2);
+  background: var(--separator);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* Narrower columns: labels move into tooltips, then slider values go, then the dividers go
+   and the sliders shrink. Thresholds are the bar's content box, measured in WebKit on
+   2026-10-19: the row needs 789 px with labels, 656 px without them, 528 px without values
+   and 380 px compact, which fits the narrowest column (760 px window, 320 px sidebar). */
+@container (max-width: 795px) {
+  .label {
+    display: none;
+  }
+}
+
+@container (max-width: 663px) {
+  .value {
+    display: none;
+  }
+}
+
+@container (max-width: 535px) {
+  .divider {
+    display: none;
+  }
+
+  .segmented button {
+    padding: 0 var(--gap-8);
+  }
+
+  .slider {
+    flex: 0 1 96px;
+    min-width: 56px;
+  }
+}
+
+.segmented {
+  display: inline-flex;
+  height: 24px;
+  padding: var(--gap-2);
+  border-radius: var(--radius-control);
+  background: var(--fill);
+}
+
+.segmented button {
+  padding: 0 var(--gap-12);
+  border: 0;
+  border-radius: calc(var(--radius-control) - var(--gap-2));
+  background: transparent;
+  color: var(--label-secondary);
+  font: var(--type-callout);
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--fill-segment-selected);
+  box-shadow: var(--segment-shadow);
+  color: var(--label);
+}
+
+.segmented button:focus-visible,
+.corners button:focus-visible,
+.switch:focus-visible,
+.slider:focus-visible,
+.start:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+.slider {
+  flex: none;
+  width: 96px;
+  height: 18px;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+}
+
+.slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0 calc(var(--fill-fraction) * 100%),
+    var(--fill) calc(var(--fill-fraction) * 100%) 100%
+  );
+}
+
+.slider::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--knob);
+  box-shadow: var(--knob-shadow);
+  appearance: none;
+}
+
+.corners {
+  display: grid;
+  grid-template-columns: repeat(2, 10px);
+  gap: 3px;
+}
+
+.corners button {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-corner-picker);
+  background: var(--fill);
+}
+
+.corners button[aria-checked="true"] {
+  background: var(--accent);
+}
+
+.switch {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: var(--fill-pressed);
+  transition: background var(--duration-toggle) var(--ease-standard);
+}
+
+.switch[aria-checked="true"] {
+  background: var(--accent);
+}
+
+.knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--on-accent);
+  transition: transform var(--duration-toggle) var(--ease-standard);
+}
+
+.switch[aria-checked="true"] .knob {
+  transform: translateX(14px);
+}
+
+.start {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-6);
+  height: var(--control-large);
+  padding: 0 var(--gap-16);
+  border: 0;
+  border-radius: calc(var(--control-large) / 2);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: var(--type-body-emphasized);
+  transition: background var(--duration-press) linear;
+}
+
+.start:active {
+  background: var(--accent-pressed);
+}
+
+.stop {
+  background: var(--fill);
+  color: var(--label);
+}
+
+.stop:active {
+  background: var(--fill-pressed);
+}

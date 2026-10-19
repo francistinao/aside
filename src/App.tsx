@@ -3,6 +3,8 @@ import { listen } from '@tauri-apps/api/event';
 import type { Editor } from '@tiptap/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './App.module.css';
+import { ControlBar } from './controls/ControlBar';
+import type { CaptureStatus, PrompterSettings } from './controls/ControlBar';
 import { ScriptView } from './editor/ScriptView';
 import { Toolbar } from './editor/Toolbar';
 import { EmptyLibrary } from './library/EmptyLibrary';
@@ -15,14 +17,23 @@ import { describeError, parentOf, vault } from './library/vault';
 import type { FileData, Hit } from './library/vault';
 import { useShortcuts } from './shell/useShortcuts';
 
-interface ShellSettings {
+interface ShellSettings extends PrompterSettings {
   sidebarWidth: number;
   sidebarVisible: boolean;
-  wpm: number;
 }
 
-const DEFAULT_SHELL: ShellSettings = { sidebarWidth: 240, sidebarVisible: true, wpm: 150 };
+const DEFAULT_SHELL: ShellSettings = {
+  sidebarWidth: 240,
+  sidebarVisible: true,
+  wpm: 150,
+  highlight: 'word',
+  opacity: 85,
+  corner: 'bottom-right',
+  hideFromCapture: true,
+};
 const PERSIST_DELAY_MS = 150;
+
+type SessionState = 'idle' | 'countdown' | 'running' | 'paused' | 'ended';
 
 interface MenuAction {
   id: string;
@@ -40,6 +51,9 @@ function scriptName(path: string): string {
 export function App() {
   const [shell, setShell] = useState<ShellSettings>(DEFAULT_SHELL);
   const [shellLoaded, setShellLoaded] = useState(false);
+  const [sessionState, setSessionState] = useState<SessionState>('idle');
+  const [capture, setCapture] = useState<CaptureStatus>('visible');
+  const pendingPatch = useRef<Partial<ShellSettings>>({});
   const [view, setView] = useState<SmartId>('all');
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -60,31 +74,84 @@ export function App() {
     invoke<ShellSettings>('settings_get')
       .then((value) => {
         if (!active) return;
-        setShell({ sidebarWidth: value.sidebarWidth, sidebarVisible: value.sidebarVisible, wpm: value.wpm });
+        setShell({
+          sidebarWidth: value.sidebarWidth,
+          sidebarVisible: value.sidebarVisible,
+          wpm: value.wpm,
+          highlight: value.highlight,
+          opacity: value.opacity,
+          corner: value.corner,
+          hideFromCapture: value.hideFromCapture,
+        });
         setShellLoaded(true);
       })
       .catch(report);
+    invoke<CaptureStatus>('capture_status').then(setCapture).catch(report);
     return () => {
       active = false;
     };
   }, [report]);
 
-  // Sidebar width and visibility are remembered. A drag writes once it rests.
+  // Every change shows at once and is written after a short rest, so a slider drag or a
+  // sidebar resize does not hit the store on every pixel.
   useEffect(() => {
     if (!shellLoaded) return;
     const timer = setTimeout(() => {
-      invoke('settings_set', { patch: { sidebarWidth: shell.sidebarWidth, sidebarVisible: shell.sidebarVisible } }).catch(report);
+      const patch = pendingPatch.current;
+      pendingPatch.current = {};
+      if (Object.keys(patch).length > 0) invoke('settings_set', { patch }).catch(report);
     }, PERSIST_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [shell.sidebarWidth, shell.sidebarVisible, shellLoaded, report]);
+  }, [shell, shellLoaded, report]);
 
-  const toggleSidebar = useCallback(() => setShell((current) => ({ ...current, sidebarVisible: !current.sidebarVisible })), []);
+  const changeSettings = useCallback((patch: Partial<ShellSettings>) => {
+    pendingPatch.current = { ...pendingPatch.current, ...patch };
+    setShell((current) => ({ ...current, ...patch }));
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setShell((current) => {
+      pendingPatch.current = { ...pendingPatch.current, sidebarVisible: !current.sidebarVisible };
+      return { ...current, sidebarVisible: !current.sidebarVisible };
+    });
+  }, []);
 
   const find = useCallback(() => {
-    setShell((current) => (current.sidebarVisible ? current : { ...current, sidebarVisible: true }));
+    changeSettings({ sidebarVisible: true });
     searchRef.current?.focus();
     searchRef.current?.select();
+  }, [changeSettings]);
+
+  // The prompter's state and capture status drive the Start button and the switch tooltip.
+  useEffect(() => {
+    let active = true;
+    const stops: (() => void)[] = [];
+    const keep = (stop: () => void) => {
+      if (active) stops.push(stop);
+      else stop();
+    };
+    void listen<{ state: SessionState }>('session://state', (event) => setSessionState(event.payload.state)).then(keep);
+    void listen<CaptureStatus>('capture://status', (event) => setCapture(event.payload)).then(keep);
+    return () => {
+      active = false;
+      for (const stop of stops) stop();
+    };
   }, []);
+
+  const startSession = useCallback(() => {
+    if (openPath === null) return;
+    const flush = flushRef.current?.() ?? Promise.resolve();
+    void flush
+      .then(() => {
+        const markdown = editorRef.current?.getMarkdown() ?? '';
+        return invoke('session_start', { markdown, path: openPath });
+      })
+      .catch(report);
+  }, [openPath, report]);
+
+  const stopSession = useCallback(() => {
+    invoke('session_control', { action: 'stop' }).catch(report);
+  }, [report]);
 
   // Results follow the query with a short rest, and refresh when the folder changes.
   useEffect(() => {
@@ -169,6 +236,10 @@ export function App() {
       const done = (task: Promise<unknown>) => task.then(() => refresh()).catch(report);
       const chain = () => editorRef.current?.chain().focus();
       switch (action.id) {
+        case 'session.toggle':
+          if (sessionState === 'idle') startSession();
+          else stopSession();
+          break;
         case 'view.toggle-sidebar':
           toggleSidebar();
           break;
@@ -239,7 +310,7 @@ export function App() {
           break;
       }
     },
-    [openPath, library.tree, refresh, report, createScript, createFolder, open, toggleSidebar, find],
+    [openPath, library.tree, refresh, report, createScript, createFolder, open, toggleSidebar, find, sessionState, startSession, stopSession],
   );
 
   const dispatch = useCallback((id: string) => act({ id }), [act]);
@@ -322,26 +393,36 @@ export function App() {
             onSelect={setSelectedId}
             onOpen={openScript}
             onContextMenu={contextMenu}
-            onWidth={(value) => setShell((current) => ({ ...current, sidebarWidth: value }))}
+            onWidth={(value) => changeSettings({ sidebarWidth: value })}
             onNewScript={newScript}
           />
         )}
       </aside>
       <main className={styles.main}>
         {showScript && openPath !== null && shownFile !== null ? (
-          <ScriptView
-            key={openPath}
-            path={openPath}
-            name={scriptName(openPath)}
-            content={shownFile.content}
-            modified={shownFile.modified}
-            wpm={shell.wpm}
-            onSaved={saved}
-            onError={report}
-            onToggleSidebar={toggleSidebar}
-            flushRef={flushRef}
-            editorRef={editorRef}
-          />
+          <>
+            <ScriptView
+              key={openPath}
+              path={openPath}
+              name={scriptName(openPath)}
+              content={shownFile.content}
+              modified={shownFile.modified}
+              wpm={shell.wpm}
+              onSaved={saved}
+              onError={report}
+              onToggleSidebar={toggleSidebar}
+              flushRef={flushRef}
+              editorRef={editorRef}
+            />
+            <ControlBar
+              settings={shell}
+              capture={capture}
+              running={sessionState !== 'idle'}
+              onChange={changeSettings}
+              onStart={startSession}
+              onStop={stopSession}
+            />
+          </>
         ) : (
           <>
             <Toolbar editor={null} name={null} modified={null} onToggleSidebar={toggleSidebar} onError={report} />

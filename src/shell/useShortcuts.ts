@@ -13,6 +13,7 @@ export function shortcutAction(event: KeyboardEvent): string | null {
   const { shiftKey, altKey, ctrlKey } = event;
   if (isMac ? ctrlKey && !shiftKey && !altKey && key === 's' : shiftKey && !altKey && key === 's') return 'view.toggle-sidebar';
   if (!shiftKey && !altKey && key === 'f') return 'edit.find';
+  if (!shiftKey && !altKey && key === 'enter') return 'session.toggle';
   if (!altKey && key === 'n') return shiftKey ? 'file.new-folder' : 'file.new-script';
   if (altKey && !shiftKey) {
     if (event.code === 'Digit1') return 'format.title';
@@ -26,6 +27,8 @@ export function shortcutAction(event: KeyboardEvent): string | null {
 export function useShortcuts(dispatch: (id: string) => void): void {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      // The editor handles some of these keys itself, and IME composition owns Enter.
+      if (event.defaultPrevented || event.isComposing) return;
       const id = shortcutAction(event);
       if (id === null) return;
       event.preventDefault();

@@ -59,7 +59,6 @@ pub struct SessionInfo {
 #[tauri::command]
 fn session_start(
     app: AppHandle,
-    session: State<'_, SessionHandle>,
     settings: State<'_, SettingsState>,
     markdown: String,
     path: Option<String>,
@@ -74,18 +73,45 @@ fn session_start(
         })
         .unwrap_or_else(|| "Untitled".to_string());
     let estimate = estimate(&script.tokens, settings.get().wpm);
-    prompter::set_visible(&app, true)?;
-    session.send(Control::Start(ScriptPayload {
+    let payload = ScriptPayload {
         title: title.clone(),
         tokens: script.tokens,
         words: estimate.words,
         total: estimate.seconds,
-    }));
-    Ok(SessionInfo {
+    };
+    let info = SessionInfo {
         title,
         words: estimate.words,
         seconds: estimate.seconds,
-    })
+    };
+    #[cfg(target_os = "macos")]
+    if !settings.get().capture_notice_shown {
+        // Once, before the first session: macOS cannot promise to keep the bubble out of a
+        // full screen share. Copy from docs/INVISIBILITY.md. The session starts after OK.
+        use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+        settings.modify(|s| s.capture_notice_shown = true)?;
+        let after = app.clone();
+        app.dialog()
+            .message("macOS may include the Prompter when you share your entire screen. Share a single window or tab to keep it out.")
+            .title("Aside")
+            .buttons(MessageDialogButtons::Ok)
+            .show(move |_| {
+                let on_main = after.clone();
+                let _ = after.run_on_main_thread(move || {
+                    let _ = begin_session(&on_main, payload);
+                });
+            });
+        return Ok(info);
+    }
+    begin_session(&app, payload)?;
+    Ok(info)
+}
+
+/// Shows the bubble and hands the script to the session thread. Main thread only.
+fn begin_session(app: &AppHandle, payload: ScriptPayload) -> error::Result<()> {
+    prompter::set_visible(app, true)?;
+    app.state::<SessionHandle>().send(Control::Start(payload));
+    Ok(())
 }
 
 #[tauri::command]
