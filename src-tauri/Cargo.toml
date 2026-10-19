@@ -37,6 +37,8 @@ notify = "8.2"
 notify-debouncer-full = "0.7"
 # Remembers the Library window bounds. The prompter is denylisted.
 tauri-plugin-window-state = "2.5"
+# The global shortcuts from docs/PRODUCT.md, registered only while a session runs. Rust only.
+tauri-plugin-global-shortcut = "2.4"
 
 [dev-dependencies]
 # Temp folders for the vault tests.

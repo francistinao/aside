@@ -6,6 +6,7 @@ pub mod menu;
 pub mod prompter;
 pub mod session;
 pub mod settings;
+pub mod shortcuts;
 #[cfg(windows)]
 pub mod topmost;
 pub mod vault;
@@ -18,8 +19,10 @@ use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WindowEvent};
 
 use session::engine::{Estimate, estimate};
 use session::tokenize::tokenize;
+use session::engine::StateKind;
 use session::{Action, Control, ScriptPayload, SessionHandle};
 use settings::{Settings, SettingsPatch, SettingsState};
+use shortcuts::{ShortcutAction, ShortcutStatus, ShortcutsState};
 use vault::index::Hit;
 use vault::{ChosenFolder, ConflictChoice, FileData, Tree, Vault, VaultStatus};
 
@@ -117,7 +120,48 @@ fn begin_session(app: &AppHandle, payload: ScriptPayload) -> error::Result<()> {
     #[cfg(target_os = "macos")]
     app.set_activation_policy(tauri::ActivationPolicy::Accessory)?;
     prompter::set_visible(app, true)?;
+    shortcuts::register_all(app)?;
     app.state::<SessionHandle>().send(Control::Start(payload));
+    Ok(())
+}
+
+/// Hides the bubble, releases the shortcuts and ends the session. Main thread only.
+fn stop_session(app: &AppHandle) -> error::Result<()> {
+    prompter::set_visible(app, false)?;
+    shortcuts::unregister_all(app);
+    #[cfg(target_os = "macos")]
+    app.set_activation_policy(tauri::ActivationPolicy::Regular)?;
+    app.state::<SessionHandle>().send(Control::Act(Action::Stop));
+    Ok(())
+}
+
+/// One dispatcher for the global shortcuts and the menu bar extra. Main thread only.
+pub(crate) fn perform(app: &AppHandle, action: ShortcutAction) -> error::Result<()> {
+    let session = app.state::<SessionHandle>();
+    match action {
+        ShortcutAction::Pause => {
+            let resume = session.status().state == StateKind::Paused;
+            session.send(Control::Act(if resume { Action::Resume } else { Action::Pause }));
+        }
+        ShortcutAction::Prev => session.send(Control::Act(Action::Prev)),
+        ShortcutAction::Next => session.send(Control::Act(Action::Next)),
+        ShortcutAction::Restart => session.send(Control::Act(Action::Restart)),
+        ShortcutAction::Faster | ShortcutAction::Slower => {
+            // Through the settings, so the bar, the menu and the session agree.
+            let settings = app.state::<SettingsState>();
+            let before = settings.get();
+            let after = settings.modify(|s| {
+                s.wpm = if action == ShortcutAction::Faster {
+                    s.wpm.saturating_add(shortcuts::WPM_STEP)
+                } else {
+                    s.wpm.saturating_sub(shortcuts::WPM_STEP)
+                };
+            })?;
+            settings::apply(app, &before, &after)?;
+        }
+        ShortcutAction::ToggleHidden => prompter::toggle_hidden(app),
+        ShortcutAction::Stop => stop_session(app)?,
+    }
     Ok(())
 }
 
@@ -133,12 +177,25 @@ fn session_control(
     action: Action,
 ) -> error::Result<()> {
     if matches!(action, Action::Stop) {
-        prompter::set_visible(&app, false)?;
-        #[cfg(target_os = "macos")]
-        app.set_activation_policy(tauri::ActivationPolicy::Regular)?;
+        return stop_session(&app);
     }
     session.send(Control::Act(action));
     Ok(())
+}
+
+#[tauri::command]
+fn shortcuts_set(app: AppHandle, action: ShortcutAction, accelerator: String) -> error::Result<Settings> {
+    shortcuts::rebind(&app, action, &accelerator)
+}
+
+#[tauri::command]
+fn shortcuts_reset(app: AppHandle, action: Option<ShortcutAction>) -> error::Result<Settings> {
+    shortcuts::reset(&app, action)
+}
+
+#[tauri::command]
+fn shortcuts_status(state: State<'_, ShortcutsState>) -> ShortcutStatus {
+    state.status()
 }
 
 #[tauri::command]
@@ -326,7 +383,9 @@ pub fn run() {
             tauri_plugin_window_state::Builder::new()
                 .with_denylist(&[prompter::LABEL])
                 .build(),
-        );
+        )
+        // Shortcuts are registered at Start, so a taken key never stops the app from launching.
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build());
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
     #[cfg(debug_assertions)]
@@ -354,6 +413,9 @@ pub fn run() {
         vault_trash,
         settings_get,
         settings_set,
+        shortcuts_set,
+        shortcuts_reset,
+        shortcuts_status,
         prompter_resize,
         capture_status,
         follow_stats
@@ -383,11 +445,15 @@ pub fn run() {
         vault_trash,
         settings_get,
         settings_set,
+        shortcuts_set,
+        shortcuts_reset,
+        shortcuts_status,
         prompter_resize,
         capture_status
     ]);
     builder
         .manage(prompter::Prompter::default())
+        .manage(ShortcutsState::default())
         .manage(menu::MenuContext::default())
         .manage(Quitting::default())
         .on_menu_event(menu::handle)

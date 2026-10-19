@@ -15,6 +15,7 @@ use crate::lock::lock;
 use crate::prompter;
 use crate::session::engine::{MAX_WPM, MIN_WPM};
 use crate::session::{Control, Highlight, SessionHandle};
+use crate::shortcuts::{self, Shortcuts};
 
 const FILE: &str = "settings.json";
 const KEY: &str = "settings";
@@ -56,6 +57,8 @@ pub struct Settings {
     pub flip_at_edges: bool,
     pub peek_key: PeekKey,
     pub fade_while_clicking: bool,
+    /// Accelerator per action, changed through the shortcuts commands.
+    pub shortcuts: Shortcuts,
     /// Absolute path of the scripts folder, None before first run.
     pub scripts_folder: Option<String>,
     /// Relative paths inside the scripts folder.
@@ -81,6 +84,7 @@ impl Default for Settings {
             flip_at_edges: true,
             peek_key: PeekKey::Control,
             fade_while_clicking: false,
+            shortcuts: shortcuts::defaults(),
             scripts_folder: None,
             pins: Vec::new(),
             recents: Vec::new(),
@@ -173,6 +177,7 @@ impl Settings {
         self.opacity = (self.opacity.clamp(MIN_OPACITY, MAX_OPACITY) / OPACITY_STEP) * OPACITY_STEP;
         self.sidebar_width = self.sidebar_width.clamp(MIN_SIDEBAR, MAX_SIDEBAR);
         self.recents.truncate(MAX_RECENTS);
+        shortcuts::complete(&mut self.shortcuts);
         self
     }
 }
@@ -364,10 +369,20 @@ mod tests {
         assert_eq!(json["flipAtEdges"], true);
         assert_eq!(json["peekKey"], "control");
         assert_eq!(json["fadeWhileClicking"], false);
+        assert_eq!(json["shortcuts"]["pause"], "Control+Alt+Space");
         let back: Settings = serde_json::from_value(json).expect("deserialize");
         assert_eq!(back, Settings::default());
         let partial: Settings = serde_json::from_str(r#"{"wpm": 200}"#).expect("partial");
         assert_eq!(partial.wpm, 200);
         assert_eq!(partial.opacity, 85);
+    }
+
+    #[test]
+    fn an_older_file_gets_the_missing_shortcuts() {
+        let json = r#"{"shortcuts": {"stop": "Control+Alt+KeyS"}}"#;
+        let settings: Settings = serde_json::from_str(json).expect("partial");
+        let settings = settings.normalized();
+        assert_eq!(settings.shortcuts.len(), 8);
+        assert_eq!(settings.shortcuts[&crate::shortcuts::ShortcutAction::Stop], "Control+Alt+KeyS");
     }
 }

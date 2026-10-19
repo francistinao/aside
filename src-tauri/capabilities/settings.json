@@ -1,0 +1,18 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "settings",
+  "description": "The Settings window",
+  "windows": ["settings"],
+  "permissions": [
+    "core:default",
+    "allow-platform-info",
+    "allow-settings-get",
+    "allow-settings-set",
+    "allow-shortcuts-set",
+    "allow-shortcuts-reset",
+    "allow-shortcuts-status",
+    "allow-capture-status",
+    "allow-vault-status",
+    "allow-vault-choose-folder"
+  ]
+}

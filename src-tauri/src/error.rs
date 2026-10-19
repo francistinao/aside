@@ -32,6 +32,12 @@ pub enum Error {
     NameTaken(String),
     #[error("Couldn't move \"{0}\" to the Trash.")]
     Trash(String),
+    #[error("Another app is using this shortcut. Choose a different one.")]
+    ShortcutTaken,
+    #[error("That shortcut can't be used. Add a modifier key and one other key.")]
+    BadShortcut,
+    #[error(transparent)]
+    Shortcut(#[from] tauri_plugin_global_shortcut::Error),
 }
 
 impl Serialize for Error {
