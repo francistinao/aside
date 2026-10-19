@@ -12,8 +12,11 @@ body {
 }
 
 /* The window is a few pixels larger than the bubble so the corners anti-alias cleanly.
-   The bubble sits in the window corner that faces the pointer. */
+   The bubble sits in the window corner that faces the pointer. Text size sets the line
+   height and font for the three slots. */
 .bubble {
+  --line: 26px;
+  --prompter-font: var(--type-prompter);
   position: absolute;
   top: var(--gap-4);
   left: var(--gap-4);
@@ -27,6 +30,16 @@ body {
   border-radius: var(--radius-prompter);
   color: var(--prompter-text);
   text-align: left;
+}
+
+.bubble[data-size="medium"] {
+  --line: 28px;
+  --prompter-font: var(--type-prompter-medium);
+}
+
+.bubble[data-size="large"] {
+  --line: 32px;
+  --prompter-font: var(--type-prompter-large);
 }
 
 .bubble[data-corner="bottom-right"] {
@@ -55,23 +68,82 @@ body {
   border-bottom-right-radius: var(--radius-prompter-sharp);
 }
 
+/* Section label row. Fixed height, empty before the first heading. */
+.label {
+  height: 14px;
+  font: var(--type-subheadline);
+  font-weight: 600;
+  color: var(--prompter-heading);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Three line slots. The current line always sits in the middle one. */
+.viewport {
+  position: relative;
+  height: calc(3 * var(--line));
+  overflow: hidden;
+}
+
 .lines {
-  display: flex;
-  flex-direction: column;
+  transition: transform var(--duration-line) var(--ease-standard);
+  will-change: transform;
+}
+
+.paragraph {
+  margin: 0;
+  font: var(--prompter-font);
 }
 
 .line {
+  height: var(--line);
   margin: 0;
-  font: var(--type-prompter);
+  font: var(--prompter-font);
   white-space: nowrap;
   overflow: hidden;
+  color: var(--prompter-text-previous);
+}
+
+.word.bold {
+  font-weight: 700;
+}
+
+.word.italic {
+  font-style: italic;
 }
 
 .line.previous {
   color: var(--prompter-text-previous);
 }
 
-.line.current {
+.line.next {
+  color: var(--prompter-text-next);
+}
+
+.bubble[data-mode="line"] .line.next {
+  color: var(--prompter-text-next-line-mode);
+}
+
+/* Word mode: read words bright, the current word on the highlight, unread words dimmed.
+   Sibling selectors do the coloring so a position event touches only two spans. */
+.bubble[data-mode="word"] .line.current {
+  color: var(--prompter-text);
+}
+
+.bubble[data-mode="word"] .line.current .word.current {
+  background: var(--highlight);
+  color: var(--on-highlight);
+  border-radius: var(--radius-highlight);
+  padding: var(--prompter-highlight-padding);
+  margin: 0 calc(-1 * var(--gap-4));
+}
+
+.bubble[data-mode="word"] .line.current .word.current ~ .word {
+  color: var(--prompter-text-unread);
+}
+
+/* Line mode: the whole current line bright on a soft band. */
+.bubble[data-mode="line"] .line.current {
   color: var(--prompter-text);
   background: var(--prompter-band);
   border-radius: var(--radius-band);
@@ -79,14 +151,56 @@ body {
   padding: 0 var(--gap-4);
 }
 
-.line.next {
-  color: var(--prompter-text-next-line-mode);
+/* Countdown digits and the end of the script sit over the lines. */
+.message {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font: var(--prompter-font);
+  color: var(--prompter-text);
+}
+
+.bubble[data-state="countdown"] .message {
+  font: var(--type-prompter-large);
+}
+
+.bubble[data-state="countdown"] .message,
+.bubble[data-state="ended"] .message {
+  display: flex;
+}
+
+.bubble[data-state="countdown"] .lines,
+.bubble[data-state="ended"] .lines,
+.bubble[data-state="idle"] .lines {
+  visibility: hidden;
 }
 
 .footer {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  gap: var(--gap-4);
+}
+
+.progress {
+  height: var(--prompter-progress-height);
+  background: var(--prompter-progress-track);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--prompter-progress-fill);
+  transform-origin: left;
+  transform: scaleX(0);
+}
+
+.meta {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
+  height: 14px;
   font: var(--type-subheadline);
   font-size: var(--prompter-footer-size);
   color: var(--prompter-footer);
@@ -113,4 +227,10 @@ body {
 .dot[data-tone="warning"] {
   display: inline-block;
   background: var(--warning);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lines {
+    transition: none;
+  }
 }
