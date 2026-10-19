@@ -100,11 +100,6 @@ fn prompter_resize(app: AppHandle, width: f64, height: f64) -> error::Result<()>
 }
 
 #[tauri::command]
-fn prompter_set_visible(app: AppHandle, visible: bool) -> error::Result<capture::CaptureStatus> {
-    prompter::set_visible(&app, visible)
-}
-
-#[tauri::command]
 fn capture_status(prompter: State<'_, prompter::Prompter>) -> capture::CaptureStatus {
     prompter.capture_status()
 }
@@ -129,7 +124,6 @@ pub fn run() {
         settings_get,
         settings_set,
         prompter_resize,
-        prompter_set_visible,
         capture_status,
         follow_stats
     ]);
@@ -142,7 +136,6 @@ pub fn run() {
         settings_get,
         settings_set,
         prompter_resize,
-        prompter_set_visible,
         capture_status
     ]);
     builder

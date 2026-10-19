@@ -1,0 +1,144 @@
+.harness {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-12);
+  padding: var(--gap-24);
+  max-width: var(--writing-column);
+}
+
+.script {
+  height: 200px;
+  padding: var(--gap-8);
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--fill);
+  color: var(--label);
+  font: var(--type-editor-body);
+  resize: vertical;
+}
+
+.script:focus-visible,
+.primary:focus-visible,
+.secondary:focus-visible,
+.segmented button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-8);
+}
+
+.primary {
+  height: var(--control-large);
+  padding: 0 var(--gap-16);
+  border: 0;
+  border-radius: calc(var(--control-large) / 2);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: var(--type-body-emphasized);
+  transition: background var(--duration-press) linear;
+}
+
+.primary:active {
+  background: var(--accent-pressed);
+}
+
+.secondary {
+  height: var(--control-regular);
+  padding: 0 var(--gap-12);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--fill);
+  color: var(--label);
+  font: var(--type-body);
+  transition: background var(--duration-press) linear;
+}
+
+.secondary:hover {
+  background: var(--fill-hover);
+}
+
+.secondary:active {
+  background: var(--fill-pressed);
+}
+
+.secondary:disabled {
+  color: var(--label-quaternary);
+}
+
+.segmented {
+  display: inline-flex;
+  height: 24px;
+  padding: var(--gap-2);
+  border-radius: var(--radius-control);
+  background: var(--fill);
+}
+
+.segmented button {
+  padding: 0 var(--gap-12);
+  border: 0;
+  border-radius: calc(var(--radius-control) - var(--gap-2));
+  background: transparent;
+  color: var(--label-secondary);
+  font: var(--type-callout);
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--fill-segment-selected);
+  box-shadow: var(--segment-shadow);
+  color: var(--label);
+}
+
+.control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-8);
+  font: var(--type-callout);
+  color: var(--label-secondary);
+}
+
+.control input[type="range"] {
+  accent-color: var(--accent);
+}
+
+.control select {
+  height: var(--control-regular);
+  padding: 0 var(--gap-8);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--fill);
+  color: var(--label);
+}
+
+.value {
+  min-width: 56px;
+  font: var(--type-callout);
+  color: var(--label-secondary);
+}
+
+.readout {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--gap-4) var(--gap-16);
+  margin: 0;
+  font: var(--type-callout);
+}
+
+.readout dt {
+  color: var(--label-secondary);
+}
+
+.readout dd {
+  margin: 0;
+  color: var(--label);
+}
+
+.error {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--destructive);
+}

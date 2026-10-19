@@ -8,7 +8,6 @@ fn main() {
         "settings_get",
         "settings_set",
         "prompter_resize",
-        "prompter_set_visible",
         "capture_status",
         "follow_stats",
     ]);
