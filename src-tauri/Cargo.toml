@@ -1,0 +1,21 @@
+[package]
+name = "aside"
+version = "0.1.0"
+description = "A teleprompter that lives next to your mouse pointer"
+authors = ["Francis Tin-ao"]
+license = "MIT"
+edition = "2024"
+rust-version = "1.90"
+
+[lib]
+name = "aside_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+# macos-private-api: transparent windows on macOS need it, and so does tauri-nspanel.
+tauri = { version = "2.12", features = ["macos-private-api"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

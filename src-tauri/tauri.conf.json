@@ -1,0 +1,65 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Aside",
+  "version": "0.1.0",
+  "identifier": "space.wsoft.aside",
+  "build": {
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "removeUnusedCommands": true
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "library",
+        "url": "index.html",
+        "title": "Aside",
+        "width": 1100,
+        "height": 720,
+        "minWidth": 760,
+        "minHeight": 480,
+        "theme": "Dark"
+      },
+      {
+        "label": "prompter",
+        "url": "overlay.html",
+        "create": false,
+        "width": 380,
+        "height": 140,
+        "transparent": true,
+        "decorations": false,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "focus": false,
+        "focusable": false,
+        "visible": false,
+        "visibleOnAllWorkspaces": true,
+        "contentProtected": true,
+        "acceptFirstMouse": false,
+        "noRedirectionBitmap": true,
+        "backgroundThrottling": "disabled",
+        "theme": "Dark"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self'; img-src 'self' data:",
+      "devCsp": "default-src 'self' http://localhost:1420 ws://localhost:1420; style-src 'self' 'unsafe-inline' http://localhost:1420; img-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg", "nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
