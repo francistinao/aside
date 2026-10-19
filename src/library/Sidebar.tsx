@@ -1,10 +1,12 @@
 import { Plus } from 'lucide-react';
 import { useMemo, useRef } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
+import { SearchField } from './SearchField';
+import { SearchResults } from './SearchResults';
 import { SidebarRow } from './SidebarRow';
 import { buildTree, moveSelection, parentRowId, sidebarRows } from './tree';
 import type { Row, SmartId } from './tree';
-import type { Tree } from './vault';
+import type { Hit, Tree } from './vault';
 import styles from './sidebar.module.css';
 
 export const MIN_SIDEBAR = 200;
@@ -15,7 +17,12 @@ interface Props {
   view: SmartId;
   expanded: ReadonlySet<string>;
   selectedId: string | null;
+  openPath: string | null;
   width: number;
+  query: string;
+  hits: Hit[];
+  searchRef: RefObject<HTMLInputElement | null>;
+  onQuery: (query: string) => void;
   onView: (view: SmartId) => void;
   onToggleFolder: (path: string, expanded: boolean) => void;
   onSelect: (id: string | null) => void;
@@ -26,7 +33,9 @@ interface Props {
 }
 
 export function Sidebar(props: Props) {
-  const { tree, view, expanded, selectedId, width, onView, onToggleFolder, onSelect, onOpen, onContextMenu, onWidth, onNewScript } = props;
+  const { tree, view, expanded, selectedId, openPath, width, query, hits, searchRef, onQuery } = props;
+  const { onView, onToggleFolder, onSelect, onOpen, onContextMenu, onWidth, onNewScript } = props;
+  const searching = query.trim() !== '';
   const rows = useMemo(
     () => sidebarRows(buildTree(tree.entries), view, expanded, { recents: tree.recents, pinned: tree.pins }, tree.entries),
     [tree, view, expanded],
@@ -84,11 +93,16 @@ export function Sidebar(props: Props) {
 
   return (
     <>
-      <div className={styles.list} role="tree" tabIndex={0} aria-label="Scripts" onKeyDown={onKeyDown}>
-        {rows.map((row) => (
-          <SidebarRow key={row.id} row={row} selected={row.id === selectedId} onSelect={activate} onContextMenu={onContextMenu} />
-        ))}
-      </div>
+      <SearchField value={query} onChange={onQuery} inputRef={searchRef} />
+      {searching ? (
+        <SearchResults query={query.trim()} hits={hits} openPath={openPath} onOpen={onOpen} />
+      ) : (
+        <div className={styles.list} role="tree" tabIndex={0} aria-label="Scripts" onKeyDown={onKeyDown}>
+          {rows.map((row) => (
+            <SidebarRow key={row.id} row={row} selected={row.id === selectedId} onSelect={activate} onContextMenu={onContextMenu} />
+          ))}
+        </div>
+      )}
       <div className={styles.footer}>
         <button type="button" className={styles.newScript} onClick={onNewScript}>
           <Plus size={16} strokeWidth={1.5} aria-hidden="true" />

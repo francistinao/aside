@@ -7,16 +7,21 @@ import { isMac } from '../platform';
 
 export interface ShortcutHandlers {
   toggleSidebar: () => void;
+  find: () => void;
 }
 
 export function useShortcuts(handlers: ShortcutHandlers): void {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const key = event.key.toLowerCase();
+      const mod = isMac ? event.metaKey : event.ctrlKey;
       const toggle = isMac ? event.metaKey && event.ctrlKey && key === 's' : event.ctrlKey && event.shiftKey && key === 's';
       if (toggle) {
         event.preventDefault();
         handlers.toggleSidebar();
+      } else if (mod && !event.shiftKey && !event.altKey && key === 'f') {
+        event.preventDefault();
+        handlers.find();
       }
     }
     window.addEventListener('keydown', onKeyDown);

@@ -1,11 +1,13 @@
 import { invoke } from '@tauri-apps/api/core';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styles from './App.module.css';
+import { EmptyLibrary } from './library/EmptyLibrary';
 import { FolderScreen } from './library/FolderScreen';
 import { Sidebar } from './library/Sidebar';
 import type { Row, SmartId } from './library/tree';
 import { useVault } from './library/useVault';
 import { describeError, parentOf, vault } from './library/vault';
+import type { Hit } from './library/vault';
 import { useShortcuts } from './shell/useShortcuts';
 
 interface ShellSettings {
@@ -21,6 +23,9 @@ export function App() {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [hits, setHits] = useState<Hit[]>([]);
+  const searchRef = useRef<HTMLInputElement | null>(null);
   const library = useVault();
   const report = useCallback((reason: unknown) => setError(describeError(reason)), []);
 
@@ -42,10 +47,36 @@ export function App() {
   }, [report]);
 
   const shortcuts = useMemo(
-    () => ({ toggleSidebar: () => saveShell({ sidebarVisible: !shell.sidebarVisible }) }),
+    () => ({
+      toggleSidebar: () => saveShell({ sidebarVisible: !shell.sidebarVisible }),
+      find: () => {
+        if (!shell.sidebarVisible) saveShell({ sidebarVisible: true });
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      },
+    }),
     [saveShell, shell.sidebarVisible],
   );
   useShortcuts(shortcuts);
+
+  // Results follow the query with a short rest, and refresh when the folder changes.
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed === '') return;
+    let active = true;
+    const timer = setTimeout(() => {
+      vault
+        .search(trimmed)
+        .then((found) => {
+          if (active) setHits(found);
+        })
+        .catch(report);
+    }, 100);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [query, library.tree, report]);
 
   function toggleFolder(path: string, open: boolean) {
     setExpanded((current) => {
@@ -72,6 +103,7 @@ export function App() {
 
   const width = shell.sidebarVisible ? shell.sidebarWidth : 0;
   const folderProblem = library.phase === 'noFolder' || library.phase === 'missing';
+  const noScripts = library.phase === 'ready' && !library.tree?.entries.some((entry) => entry.kind === 'script');
 
   return (
     <div className={styles.shell} style={{ '--sidebar-width': `${width}px` } as React.CSSProperties}>
@@ -83,7 +115,12 @@ export function App() {
             view={view}
             expanded={expanded}
             selectedId={selectedId}
+            openPath={library.openPath}
             width={shell.sidebarWidth}
+            query={query}
+            hits={hits}
+            searchRef={searchRef}
+            onQuery={setQuery}
             onView={setView}
             onToggleFolder={toggleFolder}
             onSelect={setSelectedId}
@@ -98,6 +135,7 @@ export function App() {
         <header className={styles.toolbar} data-tauri-drag-region />
         <section className={styles.content}>
           {folderProblem && <FolderScreen missing={library.phase === 'missing'} onChoose={() => void library.chooseFolder()} />}
+          {noScripts && <EmptyLibrary onNewScript={newScript} />}
           {(error ?? library.error) !== null && !folderProblem && <p className={styles.error}>{error ?? library.error}</p>}
         </section>
       </main>
