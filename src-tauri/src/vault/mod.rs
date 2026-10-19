@@ -1,6 +1,9 @@
 //! Scripts on disk: a folder the user owns, plain markdown files, nothing else.
 //! Every path from the frontend is relative to that folder and checked before use.
 
+pub mod index;
+pub mod watch;
+
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -16,6 +19,7 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 use crate::error::{Error, Result};
 use crate::lock::lock;
 use crate::settings::SettingsState;
+use index::{Hit, Index};
 
 const SCRIPT_EXT: &str = "md";
 const UNTITLED: &str = "Untitled";
@@ -101,10 +105,12 @@ pub fn content_hash(content: &str) -> u64 {
     hasher.finish()
 }
 
-/// Managed state: the scripts folder and what we wrote to it.
+/// Managed state: the scripts folder, the search index, the watcher and what we wrote.
 pub struct Vault {
     root: Mutex<Option<PathBuf>>,
     pub recent_writes: Mutex<RecentWrites>,
+    index: Mutex<Index>,
+    watcher: Mutex<Option<watch::Watcher>>,
 }
 
 impl Vault {
@@ -112,7 +118,28 @@ impl Vault {
         Self {
             root: Mutex::new(root),
             recent_writes: Mutex::new(RecentWrites::default()),
+            index: Mutex::new(Index::default()),
+            watcher: Mutex::new(None),
         }
+    }
+
+    /// Watches the folder and builds the index. Replaces any earlier watcher.
+    pub fn start_watching(&self, app: &AppHandle) -> Result<()> {
+        let root = self.root()?;
+        let watcher = watch::start(app.clone(), &root)?;
+        *lock(&self.watcher) = Some(watcher);
+        self.rebuild_index()
+    }
+
+    pub fn rebuild_index(&self) -> Result<()> {
+        let root = self.root()?;
+        let entries = self.entries()?;
+        *lock(&self.index) = Index::build(&root, &entries);
+        Ok(())
+    }
+
+    pub fn search(&self, query: &str) -> Vec<Hit> {
+        lock(&self.index).search(query)
     }
 
     pub fn set_root(&self, root: Option<PathBuf>) {
@@ -174,6 +201,7 @@ impl Vault {
             entries = self.entries()?;
             open = Some(WELCOME_SCRIPT.to_string());
         }
+        self.start_watching(app)?;
         Ok(Some(ChosenFolder {
             folder: folder.to_string_lossy().into_owned(),
             entries,
@@ -246,6 +274,7 @@ impl Vault {
         }
         fs::rename(&tmp, &path)?;
         lock(&self.recent_writes).note(path.clone(), content);
+        lock(&self.index).update(relative, content);
         Ok(FileData {
             content: String::new(),
             modified: modified_ms(&path),

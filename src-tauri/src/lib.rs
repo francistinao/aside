@@ -15,6 +15,7 @@ use session::engine::{Estimate, estimate};
 use session::tokenize::tokenize;
 use session::{Action, Control, ScriptPayload, SessionHandle};
 use settings::{Settings, SettingsPatch, SettingsState};
+use vault::index::Hit;
 use vault::{ChosenFolder, Entry, FileData, Vault, VaultStatus};
 
 #[derive(Clone, Debug, Serialize)]
@@ -102,6 +103,11 @@ fn vault_reveal(vault: State<'_, Vault>, path: String) -> error::Result<()> {
 }
 
 #[tauri::command]
+fn vault_search(vault: State<'_, Vault>, query: String) -> Vec<Hit> {
+    vault.search(&query)
+}
+
+#[tauri::command]
 fn vault_read(vault: State<'_, Vault>, path: String) -> error::Result<FileData> {
     vault.read(&path)
 }
@@ -181,6 +187,7 @@ pub fn run() {
         vault_choose_folder,
         vault_tree,
         vault_reveal,
+        vault_search,
         vault_read,
         vault_write,
         vault_create,
@@ -203,6 +210,7 @@ pub fn run() {
         vault_choose_folder,
         vault_tree,
         vault_reveal,
+        vault_search,
         vault_read,
         vault_write,
         vault_create,
@@ -221,7 +229,10 @@ pub fn run() {
             let settings = SettingsState::load(app.handle())?;
             let current = settings.get();
             app.manage(settings);
-            app.manage(Vault::new(current.scripts_folder.as_deref().map(std::path::PathBuf::from)));
+            let vault = Vault::new(current.scripts_folder.as_deref().map(std::path::PathBuf::from));
+            // A missing folder is reported to the Library on its first call, not here.
+            let _ = vault.start_watching(app.handle());
+            app.manage(vault);
             let session = session::spawn(app.handle().clone(), current.wpm, current.highlight)?;
             app.manage(session);
             Ok(())

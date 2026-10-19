@@ -12,6 +12,7 @@
     "allow-vault-choose-folder",
     "allow-vault-tree",
     "allow-vault-reveal",
+    "allow-vault-search",
     "allow-vault-read",
     "allow-vault-write",
     "allow-vault-create",

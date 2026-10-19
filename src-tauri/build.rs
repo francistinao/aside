@@ -9,6 +9,7 @@ fn main() {
         "vault_choose_folder",
         "vault_tree",
         "vault_reveal",
+        "vault_search",
         "vault_read",
         "vault_write",
         "vault_create",
