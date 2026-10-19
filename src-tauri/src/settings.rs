@@ -33,7 +33,11 @@ pub enum TextSize {
     Large,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+const MIN_SIDEBAR: u32 = 200;
+const MAX_SIDEBAR: u32 = 320;
+pub const MAX_RECENTS: usize = 10;
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     pub wpm: u32,
@@ -42,6 +46,15 @@ pub struct Settings {
     pub corner: Corner,
     pub text_size: TextSize,
     pub hide_from_capture: bool,
+    /// Absolute path of the scripts folder, None before first run.
+    pub scripts_folder: Option<String>,
+    /// Relative paths inside the scripts folder.
+    pub pins: Vec<String>,
+    /// Relative paths, newest first.
+    pub recents: Vec<String>,
+    pub sidebar_width: u32,
+    pub sidebar_visible: bool,
+    pub capture_notice_shown: bool,
 }
 
 impl Default for Settings {
@@ -53,11 +66,18 @@ impl Default for Settings {
             corner: Corner::BottomRight,
             text_size: TextSize::Small,
             hide_from_capture: true,
+            scripts_folder: None,
+            pins: Vec::new(),
+            recents: Vec::new(),
+            sidebar_width: 240,
+            sidebar_visible: true,
+            capture_notice_shown: false,
         }
     }
 }
 
 /// Fields the frontend wants to change. Missing fields stay as they are.
+/// The scripts folder, pins and recents change through vault commands instead.
 #[derive(Clone, Copy, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct SettingsPatch {
@@ -67,6 +87,9 @@ pub struct SettingsPatch {
     pub corner: Option<Corner>,
     pub text_size: Option<TextSize>,
     pub hide_from_capture: Option<bool>,
+    pub sidebar_width: Option<u32>,
+    pub sidebar_visible: Option<bool>,
+    pub capture_notice_shown: Option<bool>,
 }
 
 impl Settings {
@@ -89,6 +112,15 @@ impl Settings {
         if let Some(v) = patch.hide_from_capture {
             self.hide_from_capture = v;
         }
+        if let Some(v) = patch.sidebar_width {
+            self.sidebar_width = v;
+        }
+        if let Some(v) = patch.sidebar_visible {
+            self.sidebar_visible = v;
+        }
+        if let Some(v) = patch.capture_notice_shown {
+            self.capture_notice_shown = v;
+        }
         self.normalized()
     }
 
@@ -96,6 +128,8 @@ impl Settings {
     fn normalized(mut self) -> Self {
         self.wpm = (self.wpm.clamp(MIN_WPM, MAX_WPM) / WPM_STEP) * WPM_STEP;
         self.opacity = (self.opacity.clamp(MIN_OPACITY, MAX_OPACITY) / OPACITY_STEP) * OPACITY_STEP;
+        self.sidebar_width = self.sidebar_width.clamp(MIN_SIDEBAR, MAX_SIDEBAR);
+        self.recents.truncate(MAX_RECENTS);
         self
     }
 }
@@ -110,8 +144,8 @@ pub struct StylePayload {
     pub text_size: TextSize,
 }
 
-impl From<Settings> for StylePayload {
-    fn from(s: Settings) -> Self {
+impl From<&Settings> for StylePayload {
+    fn from(s: &Settings) -> Self {
         Self {
             corner: s.corner,
             opacity: s.opacity,
@@ -143,24 +177,39 @@ impl SettingsState {
     }
 
     pub fn get(&self) -> Settings {
-        *lock(&self.current)
+        lock(&self.current).clone()
     }
 
     /// Applies a patch, saves it and returns the old and new values.
     pub fn update(&self, patch: SettingsPatch) -> Result<(Settings, Settings)> {
         let before = self.get();
-        let after = before.patched(patch);
-        if after != before {
-            *lock(&self.current) = after;
-            self.store.set(KEY, serde_json::to_value(after)?);
-            self.store.save()?;
-        }
+        let after = before.clone().patched(patch);
+        self.replace(after.clone())?;
         Ok((before, after))
+    }
+
+    /// Changes settings from Rust (folder, pins, recents) and saves.
+    pub fn modify(&self, change: impl FnOnce(&mut Settings)) -> Result<Settings> {
+        let mut after = self.get();
+        change(&mut after);
+        let after = after.normalized();
+        self.replace(after.clone())?;
+        Ok(after)
+    }
+
+    fn replace(&self, after: Settings) -> Result<()> {
+        let mut current = lock(&self.current);
+        if *current != after {
+            self.store.set(KEY, serde_json::to_value(&after)?);
+            self.store.save()?;
+            *current = after;
+        }
+        Ok(())
     }
 }
 
 /// Pushes a change into the running session, the follow loop, capture exclusion and the overlay.
-pub fn apply(app: &AppHandle, before: Settings, after: Settings) -> Result<()> {
+pub fn apply(app: &AppHandle, before: &Settings, after: &Settings) -> Result<()> {
     let session = app.state::<SessionHandle>();
     if after.wpm != before.wpm {
         session.send(Control::SetWpm(after.wpm));
@@ -180,7 +229,7 @@ pub fn apply(app: &AppHandle, before: Settings, after: Settings) -> Result<()> {
     Ok(())
 }
 
-pub fn emit_style(app: &AppHandle, settings: Settings) -> Result<()> {
+pub fn emit_style(app: &AppHandle, settings: &Settings) -> Result<()> {
     app.emit_to(prompter::LABEL, STYLE_EVENT, StylePayload::from(settings))?;
     Ok(())
 }
@@ -227,6 +276,8 @@ mod tests {
     #[test]
     fn settings_round_trip_through_json_with_camel_case() {
         let json = serde_json::to_value(Settings::default()).expect("serialize");
+        assert_eq!(json["sidebarWidth"], 240);
+        assert!(json["scriptsFolder"].is_null());
         assert_eq!(json["textSize"], "small");
         assert_eq!(json["hideFromCapture"], true);
         assert_eq!(json["corner"], "bottom-right");

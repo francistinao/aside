@@ -16,6 +16,18 @@ pub enum Error {
     NotMainThread,
     #[error("the {0} window does not exist")]
     MissingWindow(&'static str),
+    #[error("No scripts folder has been chosen yet.")]
+    NoFolder,
+    #[error("The scripts folder can't be found. Choose it again to continue.")]
+    FolderMissing,
+    #[error("That path is outside the scripts folder.")]
+    OutsideVault,
+    #[error("\"{0}\" is not a valid name.")]
+    BadName(String),
+    #[error("A script named \"{0}\" already exists.")]
+    NameTaken(String),
+    #[error("Couldn't move \"{0}\" to the Trash.")]
+    Trash(String),
 }
 
 impl Serialize for Error {

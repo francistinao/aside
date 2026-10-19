@@ -5,6 +5,7 @@ pub mod lock;
 pub mod prompter;
 pub mod session;
 pub mod settings;
+pub mod vault;
 
 use serde::Serialize;
 use tauri::webview::PageLoadEvent;
@@ -14,6 +15,7 @@ use session::engine::{Estimate, estimate};
 use session::tokenize::tokenize;
 use session::{Action, Control, ScriptPayload, SessionHandle};
 use settings::{Settings, SettingsPatch, SettingsState};
+use vault::{Entry, FileData, Vault};
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -79,6 +81,41 @@ fn session_estimate(markdown: String, wpm: u32) -> Estimate {
 }
 
 #[tauri::command]
+fn vault_tree(vault: State<'_, Vault>) -> error::Result<Vec<Entry>> {
+    vault.entries()
+}
+
+#[tauri::command]
+fn vault_read(vault: State<'_, Vault>, path: String) -> error::Result<FileData> {
+    vault.read(&path)
+}
+
+#[tauri::command]
+fn vault_write(vault: State<'_, Vault>, path: String, content: String) -> error::Result<FileData> {
+    vault.write(&path, &content)
+}
+
+#[tauri::command]
+fn vault_create(vault: State<'_, Vault>, dir: String) -> error::Result<String> {
+    vault.create(&dir)
+}
+
+#[tauri::command]
+fn vault_create_folder(vault: State<'_, Vault>, dir: String) -> error::Result<String> {
+    vault.create_folder(&dir)
+}
+
+#[tauri::command]
+fn vault_rename(vault: State<'_, Vault>, path: String, new_name: String) -> error::Result<String> {
+    vault.rename(&path, &new_name)
+}
+
+#[tauri::command]
+fn vault_trash(vault: State<'_, Vault>, path: String) -> error::Result<()> {
+    vault.trash(&path)
+}
+
+#[tauri::command]
 fn settings_get(settings: State<'_, SettingsState>) -> Settings {
     settings.get()
 }
@@ -90,7 +127,7 @@ fn settings_set(
     patch: SettingsPatch,
 ) -> error::Result<Settings> {
     let (before, after) = settings.update(patch)?;
-    settings::apply(&app, before, after)?;
+    settings::apply(&app, &before, &after)?;
     Ok(after)
 }
 
@@ -121,6 +158,13 @@ pub fn run() {
         session_set_lines,
         session_control,
         session_estimate,
+        vault_tree,
+        vault_read,
+        vault_write,
+        vault_create,
+        vault_create_folder,
+        vault_rename,
+        vault_trash,
         settings_get,
         settings_set,
         prompter_resize,
@@ -133,6 +177,13 @@ pub fn run() {
         session_set_lines,
         session_control,
         session_estimate,
+        vault_tree,
+        vault_read,
+        vault_write,
+        vault_create,
+        vault_create_folder,
+        vault_rename,
+        vault_trash,
         settings_get,
         settings_set,
         prompter_resize,
@@ -145,6 +196,7 @@ pub fn run() {
             let settings = SettingsState::load(app.handle())?;
             let current = settings.get();
             app.manage(settings);
+            app.manage(Vault::new(current.scripts_folder.as_deref().map(std::path::PathBuf::from)));
             let session = session::spawn(app.handle().clone(), current.wpm, current.highlight)?;
             app.manage(session);
             Ok(())
@@ -154,7 +206,7 @@ pub fn run() {
             if webview.label() == prompter::LABEL && matches!(payload.event(), PageLoadEvent::Finished) {
                 let status = webview.state::<prompter::Prompter>().capture_status();
                 let _ = webview.emit_to(prompter::LABEL, prompter::CAPTURE_EVENT, status);
-                let _ = settings::emit_style(webview.app_handle(), webview.state::<SettingsState>().get());
+                let _ = settings::emit_style(webview.app_handle(), &webview.state::<SettingsState>().get());
                 webview.state::<SessionHandle>().send(Control::Resend);
             }
         })
