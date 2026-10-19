@@ -25,6 +25,7 @@
       },
       {
         "label": "prompter",
+        "title": "Prompter",
         "url": "overlay.html",
         "create": false,
         "width": 380,

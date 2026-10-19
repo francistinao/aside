@@ -6,6 +6,8 @@ use serde::Serialize;
 pub enum Error {
     #[error(transparent)]
     Tauri(#[from] tauri::Error),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
     #[error("the main thread is not available")]
     NotMainThread,
     #[error("the {0} window does not exist")]

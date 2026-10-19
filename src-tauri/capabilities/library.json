@@ -3,5 +3,10 @@
   "identifier": "library",
   "description": "The Library window",
   "windows": ["library"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "allow-prompter-set-visible",
+    "allow-capture-status",
+    "allow-follow-stats"
+  ]
 }

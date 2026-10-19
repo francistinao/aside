@@ -9,11 +9,12 @@ pub mod macos;
 pub mod windows;
 
 /// What the OS let us verify. Only `Hidden` is a promise, and only Windows can make it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum CaptureStatus {
     Hidden,
     MayBeVisible,
+    #[default]
     Visible,
     Unsupported,
     Failed,
