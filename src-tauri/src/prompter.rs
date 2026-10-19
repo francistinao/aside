@@ -12,9 +12,10 @@ use crate::follow::{self, FollowConfig, FollowHandle, FollowStats};
 use crate::lock::lock;
 
 pub const LABEL: &str = "prompter";
+pub const LIBRARY: &str = "library";
 pub const CAPTURE_EVENT: &str = "capture://status";
 /// Windows that show the capture status.
-const CAPTURE_LISTENERS: [&str; 2] = ["library", LABEL];
+const CAPTURE_LISTENERS: [&str; 2] = [LIBRARY, LABEL];
 
 /// App state for the prompter. Managed by the Tauri builder.
 #[derive(Default)]

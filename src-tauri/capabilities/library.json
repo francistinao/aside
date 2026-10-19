@@ -5,6 +5,9 @@
   "windows": ["library"],
   "permissions": [
     "core:default",
+    "allow-session-start",
+    "allow-session-control",
+    "allow-session-estimate",
     "allow-prompter-set-visible",
     "allow-capture-status",
     "allow-follow-stats"

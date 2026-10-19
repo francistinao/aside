@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "prompter",
-  "description": "The Prompter overlay. It only listens for events.",
+  "description": "The Prompter overlay. It listens for events and reports its visual lines.",
   "windows": ["prompter"],
-  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten", "allow-session-set-lines"]
 }
