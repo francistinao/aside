@@ -19,6 +19,21 @@ tauri-build = { version = "2.7", features = [] }
 tauri = { version = "2.12", features = ["macos-private-api"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+thiserror = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# NSPanel conversion so the bubble shows over other apps' full screen Spaces.
+tauri-nspanel = "2.1"
+# Objective-C runtime and AppKit bindings: pointer, screens, window moves, sharing type.
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSEvent", "NSGraphics", "NSResponder", "NSScreen", "NSWindow", "objc2-core-foundation"] }
+objc2-foundation = { version = "0.3", features = ["NSGeometry"] }
+
+[target.'cfg(windows)'.dependencies]
+# Cursor, monitor, DPI and display affinity calls. Same version as tauri and tao.
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging"] }
+# Build number through RtlGetVersion. Already in tao's dependency tree.
+windows-version = "0.1"
 
 # docs/PERFORMANCE.md: speed over size; the app is small either way.
 [profile.release]
