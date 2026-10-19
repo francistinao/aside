@@ -1,0 +1,144 @@
+/* The Settings window. Values from docs/DESIGN.md through tokens.css. */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.tabs {
+  display: flex;
+  justify-content: center;
+  flex: none;
+  padding: var(--gap-16) var(--gap-24) 0;
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--gap-12) var(--gap-24) var(--gap-24);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-16);
+  min-height: 44px;
+  padding: var(--gap-6) 0;
+  border-bottom: 1px solid var(--separator);
+}
+
+.rowText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-2);
+  min-width: 0;
+}
+
+.rowLabel {
+  font: var(--type-body);
+  color: var(--label);
+}
+
+.rowHint {
+  font: var(--type-callout);
+  color: var(--label-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+}
+
+.rowControl {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-8);
+  flex: none;
+}
+
+.note {
+  margin: var(--gap-12) 0 0;
+  font: var(--type-callout);
+  color: var(--label-secondary);
+}
+
+.shortcutRow .rowLabel {
+  min-width: 180px;
+}
+
+.failure {
+  font: var(--type-callout);
+  color: var(--destructive);
+}
+
+.secondary,
+.plain,
+.recorder {
+  height: var(--control-regular);
+  padding: 0 var(--gap-12);
+  border: 0;
+  border-radius: var(--radius-control);
+  font: var(--type-body);
+  color: var(--label);
+  background: var(--fill);
+}
+
+.plain {
+  background: transparent;
+  color: var(--label-secondary);
+}
+
+.plain:hover {
+  background: var(--fill-hover);
+}
+
+.recorder {
+  min-width: 120px;
+  font-variant-numeric: tabular-nums;
+}
+
+.recorder[data-recording] {
+  color: var(--label-secondary);
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+.secondary:focus-visible,
+.plain:focus-visible,
+.recorder:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-6);
+  font: var(--type-body);
+  color: var(--label);
+}
+
+.dot {
+  display: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.dot[data-tone="success"] {
+  display: inline-block;
+  background: var(--success);
+}
+
+.dot[data-tone="warning"] {
+  display: inline-block;
+  background: var(--warning);
+}
+
+.error {
+  margin: var(--gap-12) 0 0;
+  font: var(--type-callout);
+  color: var(--destructive);
+}

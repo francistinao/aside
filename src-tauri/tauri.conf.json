@@ -29,6 +29,20 @@
         "windowEffects": { "effects": ["sidebar", "mica"], "state": "followsWindowActiveState" }
       },
       {
+        "label": "settings",
+        "url": "settings.html",
+        "title": "Settings",
+        "create": false,
+        "width": 560,
+        "height": 440,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "center": true,
+        "visible": false,
+        "theme": "Dark"
+      },
+      {
         "label": "prompter",
         "title": "Prompter",
         "url": "overlay.html",

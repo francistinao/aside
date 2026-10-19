@@ -35,6 +35,35 @@ const PERSIST_DELAY_MS = 150;
 
 type SessionState = 'idle' | 'countdown' | 'running' | 'paused' | 'ended';
 
+/// What settings_get and settings://changed carry, beyond the shell's own fields.
+interface SettingsPayload extends ShellSettings {
+  scriptsFolder: string | null;
+}
+
+const SHELL_KEYS = ['sidebarWidth', 'sidebarVisible', 'wpm', 'highlight', 'opacity', 'corner', 'hideFromCapture'] as const;
+
+function shellOf(value: SettingsPayload): ShellSettings {
+  return {
+    sidebarWidth: value.sidebarWidth,
+    sidebarVisible: value.sidebarVisible,
+    wpm: value.wpm,
+    highlight: value.highlight,
+    opacity: value.opacity,
+    corner: value.corner,
+    hideFromCapture: value.hideFromCapture,
+  };
+}
+
+/// Takes the values another window or the menu bar extra changed, except the ones this
+/// window is still about to write.
+function mergeShell(current: ShellSettings, incoming: ShellSettings, pending: Partial<ShellSettings>): ShellSettings {
+  const merged = { ...current };
+  for (const key of SHELL_KEYS) {
+    if (!(key in pending)) Object.assign(merged, { [key]: incoming[key] });
+  }
+  return merged;
+}
+
 interface MenuAction {
   id: string;
   path?: string;
@@ -54,6 +83,7 @@ export function App() {
   const [sessionState, setSessionState] = useState<SessionState>('idle');
   const [capture, setCapture] = useState<CaptureStatus>('visible');
   const pendingPatch = useRef<Partial<ShellSettings>>({});
+  const scriptsFolder = useRef<string | null>(null);
   const [view, setView] = useState<SmartId>('all');
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -71,18 +101,11 @@ export function App() {
 
   useEffect(() => {
     let active = true;
-    invoke<ShellSettings>('settings_get')
+    invoke<SettingsPayload>('settings_get')
       .then((value) => {
         if (!active) return;
-        setShell({
-          sidebarWidth: value.sidebarWidth,
-          sidebarVisible: value.sidebarVisible,
-          wpm: value.wpm,
-          highlight: value.highlight,
-          opacity: value.opacity,
-          corner: value.corner,
-          hideFromCapture: value.hideFromCapture,
-        });
+        scriptsFolder.current = value.scriptsFolder;
+        setShell(shellOf(value));
         setShellLoaded(true);
       })
       .catch(report);
@@ -132,11 +155,19 @@ export function App() {
     };
     void listen<{ state: SessionState }>('session://state', (event) => setSessionState(event.payload.state)).then(keep);
     void listen<CaptureStatus>('capture://status', (event) => setCapture(event.payload)).then(keep);
+    void listen<SettingsPayload>('settings://changed', (event) => {
+      const incoming = event.payload;
+      setShell((current) => mergeShell(current, shellOf(incoming), pendingPatch.current));
+      if (incoming.scriptsFolder !== scriptsFolder.current) {
+        scriptsFolder.current = incoming.scriptsFolder;
+        void refresh();
+      }
+    }).then(keep);
     return () => {
       active = false;
       for (const stop of stops) stop();
     };
-  }, []);
+  }, [refresh]);
 
   const startSession = useCallback(() => {
     if (openPath === null) return;

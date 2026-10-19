@@ -1,0 +1,17 @@
+/* The Settings window: a plain dark window, 560 x 440, not resizable. */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-window);
+  color: var(--label);
+  font: var(--type-body);
+  color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}

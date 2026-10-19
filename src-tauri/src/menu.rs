@@ -60,6 +60,8 @@ pub fn app_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>> {
     let aside = SubmenuBuilder::new(app, "Aside")
         .about(None)
         .separator()
+        .item(&item("app.settings", "Settings…", "CmdOrCtrl+,")?)
+        .separator()
         .services()
         .separator()
         .hide()
@@ -163,6 +165,10 @@ pub fn handle(app: &AppHandle, event: MenuEvent) {
     let id = event.id().as_ref().to_string();
     if id.starts_with("tray.") {
         let _ = crate::tray::on_action(app, &id);
+        return;
+    }
+    if id == "app.settings" {
+        let _ = crate::open_settings(app);
         return;
     }
     let path = lock(&app.state::<MenuContext>().path).take();

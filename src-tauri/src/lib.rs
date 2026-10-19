@@ -16,7 +16,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde::{Deserialize, Serialize};
 use tauri::webview::PageLoadEvent;
-use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewWindowBuilder, WindowEvent};
 
 use session::engine::{Estimate, estimate};
 use session::tokenize::tokenize;
@@ -141,6 +141,28 @@ pub(crate) fn show_library(app: &AppHandle) -> error::Result<()> {
     let window = app
         .get_webview_window(prompter::LIBRARY)
         .ok_or(error::Error::MissingWindow(prompter::LIBRARY))?;
+    window.unminimize()?;
+    window.show()?;
+    window.set_focus()?;
+    Ok(())
+}
+
+/// Shows the Settings window, building it from its config the first time. Closing it only
+/// hides it, so the next open is instant. Main thread only.
+pub(crate) fn open_settings(app: &AppHandle) -> error::Result<()> {
+    let window = match app.get_webview_window(prompter::SETTINGS) {
+        Some(window) => window,
+        None => {
+            let config = app
+                .config()
+                .app
+                .windows
+                .iter()
+                .find(|window| window.label == prompter::SETTINGS)
+                .ok_or(error::Error::MissingWindow(prompter::SETTINGS))?;
+            WebviewWindowBuilder::from_config(app, config)?.build()?
+        }
+    };
     window.unminimize()?;
     window.show()?;
     window.set_focus()?;
@@ -393,7 +415,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_window_state::Builder::new()
-                .with_denylist(&[prompter::LABEL])
+                .with_denylist(&[prompter::LABEL, prompter::SETTINGS])
                 .build(),
         )
         // Shortcuts are registered at Start, so a taken key never stops the app from launching.
@@ -470,11 +492,14 @@ pub fn run() {
         .manage(Quitting::default())
         .on_menu_event(menu::handle)
         .on_window_event(|window, event| {
-            if window.label() == prompter::LIBRARY
-                && let WindowEvent::CloseRequested { api, .. } = event
-            {
-                api.prevent_close();
-                ask_to_flush(window.app_handle(), FlushReason::Close);
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == prompter::LIBRARY {
+                    api.prevent_close();
+                    ask_to_flush(window.app_handle(), FlushReason::Close);
+                } else if window.label() == prompter::SETTINGS {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
             }
         })
         .setup(|app| {

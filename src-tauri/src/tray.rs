@@ -167,6 +167,7 @@ fn build_menu(app: &AppHandle, status: &Status, settings: &Settings) -> Result<B
         .separator()
         .item(&check("tray.hide-capture".into(), "Hide from Screen Sharing", settings.hide_from_capture)?)
         .item(&MenuItemBuilder::with_id("tray.open-library", "Open Library").accelerator("CmdOrCtrl+O").build(app)?)
+        .item(&MenuItemBuilder::with_id("tray.settings", "Settings…").accelerator("CmdOrCtrl+,").build(app)?)
         .separator()
         .item(&playback("tray.stop", "Stop Prompter", ShortcutAction::Stop)?);
     Ok(Built {
@@ -187,6 +188,7 @@ pub fn on_action(app: &AppHandle, id: &str) -> Result<()> {
         "tray.slower" => return crate::perform(app, ShortcutAction::Slower),
         "tray.stop" => return crate::perform(app, ShortcutAction::Stop),
         "tray.open-library" => return crate::show_library(app),
+        "tray.settings" => return crate::open_settings(app),
         "tray.hide-capture" => patch.hide_from_capture = Some(!current.hide_from_capture),
         "tray.highlight.word" => patch.highlight = Some(Highlight::Word),
         "tray.highlight.line" => patch.highlight = Some(Highlight::Line),

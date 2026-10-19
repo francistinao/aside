@@ -21,7 +21,7 @@ pub const LIBRARY: &str = "library";
 pub const SETTINGS: &str = "settings";
 pub const CAPTURE_EVENT: &str = "capture://status";
 /// Windows that show the capture status.
-const CAPTURE_LISTENERS: [&str; 2] = [LIBRARY, LABEL];
+const CAPTURE_LISTENERS: [&str; 3] = [LIBRARY, LABEL, SETTINGS];
 
 /// App state for the prompter. Managed by the Tauri builder.
 #[derive(Default)]
