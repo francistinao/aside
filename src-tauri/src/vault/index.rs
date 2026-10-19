@@ -144,6 +144,37 @@ mod tests {
         (dir, index)
     }
 
+    /// Performance check from docs/PERFORMANCE.md: 1,000 scripts of about 300 words.
+    /// Run with `cargo test -- --ignored --nocapture search_a_thousand_scripts`.
+    #[test]
+    #[ignore]
+    fn search_a_thousand_scripts() {
+        let words = ["demo", "settings", "click", "record", "script", "pointer", "bubble", "share"];
+        let dir = tempfile::tempdir().expect("temp dir");
+        let mut entries = Vec::new();
+        for i in 0..1000 {
+            let path = format!("Script {i}.md");
+            let body: Vec<String> = (0..300).map(|j| format!("{}{}", words[(i + j) % words.len()], j)).collect();
+            fs::write(dir.path().join(&path), body.join(" ")).expect("write");
+            entries.push(Entry {
+                path: path.clone(),
+                name: format!("Script {i}"),
+                kind: EntryKind::Script,
+                modified: 0,
+            });
+        }
+        let built = std::time::Instant::now();
+        let index = Index::build(dir.path(), &entries);
+        println!("build: {} ms", built.elapsed().as_millis());
+        for query in ["Script 5", "pointer12", "zzz"] {
+            let started = std::time::Instant::now();
+            let hits = index.search(query);
+            let took = started.elapsed();
+            println!("search {query:?}: {} hits in {:.2} ms", hits.len(), took.as_secs_f64() * 1000.0);
+            assert!(took.as_millis() < 50, "search {query:?} took {took:?}");
+        }
+    }
+
     #[test]
     fn names_rank_before_content() {
         let (_dir, index) = index_with(&[

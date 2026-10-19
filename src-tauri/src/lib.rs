@@ -308,6 +308,7 @@ fn follow_stats(prompter: State<'_, prompter::Prompter>) -> follow::FollowStats 
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let start = std::time::Instant::now();
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
@@ -404,7 +405,16 @@ pub fn run() {
             app.manage(session);
             Ok(())
         })
-        .on_page_load(|webview, payload| {
+        .on_page_load(move |webview, payload| {
+            // ASIDE_MEASURE_STARTUP=1 prints the time from run() to the Library's page load
+            // on stdout and quits. docs/PERFORMANCE.md explains how to read it.
+            if webview.label() == prompter::LIBRARY
+                && matches!(payload.event(), PageLoadEvent::Finished)
+                && std::env::var_os("ASIDE_MEASURE_STARTUP").is_some()
+            {
+                println!("startup {} ms", start.elapsed().as_millis());
+                std::process::exit(0);
+            }
             // The overlay may finish loading after the status, style and script were first sent.
             if webview.label() == prompter::LABEL && matches!(payload.event(), PageLoadEvent::Finished) {
                 let status = webview.state::<prompter::Prompter>().capture_status();
