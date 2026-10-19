@@ -410,6 +410,13 @@ fn follow_stats(prompter: State<'_, prompter::Prompter>) -> follow::FollowStats 
 pub fn run() {
     let start = std::time::Instant::now();
     let builder = tauri::Builder::default()
+        // First, so a second instance is caught before anything else sets up.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            let handle = app.clone();
+            let _ = app.run_on_main_thread(move || {
+                let _ = show_library(&handle);
+            });
+        }))
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())

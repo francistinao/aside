@@ -42,6 +42,8 @@ tauri-plugin-window-state = "2.5"
 tauri-plugin-global-shortcut = "2.4"
 # Open at login: a LaunchAgent on macOS, a Run key on Windows. No signing involved.
 tauri-plugin-autostart = "2.7"
+# A second launch shows the Library instead of a second app. Registered first.
+tauri-plugin-single-instance = "2.5"
 
 [dev-dependencies]
 # Temp folders for the vault tests.
