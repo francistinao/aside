@@ -459,6 +459,19 @@ pub fn push_recent(list: &[String], path: &str) -> Vec<String> {
     out
 }
 
+/// Points every entry that named the renamed script or folder, or anything inside that
+/// folder, at the new path. Keeps the order.
+pub fn rename_paths(list: &mut [String], old: &str, new: &str) {
+    let prefix = format!("{}/", old.trim_end_matches('/'));
+    for entry in list.iter_mut() {
+        if entry == old {
+            *entry = new.to_string();
+        } else if let Some(rest) = entry.strip_prefix(&prefix) {
+            *entry = join_relative(new, rest);
+        }
+    }
+}
+
 fn join_relative(dir: &str, name: &str) -> String {
     if dir.is_empty() || dir == "." {
         name.to_string()
@@ -585,6 +598,20 @@ mod tests {
         fs::create_dir(dir.path().join("Old")).expect("dir");
         assert_eq!(vault.rename("Old", "New").expect("rename"), "New");
         assert!(dir.path().join("New").is_dir());
+    }
+
+    #[test]
+    fn rename_paths_follow_a_script_and_everything_under_a_folder() {
+        let mut list = vec![
+            "Demo.md".to_string(),
+            "Talks/Demo.md".to_string(),
+            "Talks/Deep/Q3.md".to_string(),
+            "Talks.md".to_string(),
+        ];
+        rename_paths(&mut list, "Demo.md", "Intro.md");
+        assert_eq!(list[0], "Intro.md");
+        rename_paths(&mut list, "Talks", "Sessions");
+        assert_eq!(list, ["Intro.md", "Sessions/Demo.md", "Sessions/Deep/Q3.md", "Talks.md"]);
     }
 
     #[test]

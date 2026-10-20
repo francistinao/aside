@@ -38,6 +38,8 @@ interface Props {
   onToggleSidebar: () => void;
   /// Set so the window can save before it closes or the app quits.
   flushRef: MutableRefObject<(() => Promise<void>) | null>;
+  /// Set so pending edits can be dropped when the script is trashed or the folder changes.
+  discardRef: MutableRefObject<(() => void) | null>;
   /// Set so menu and keyboard actions can reach the editor.
   editorRef: MutableRefObject<Editor | null>;
 }
@@ -53,7 +55,19 @@ interface PopoverState {
 
 /// One open script: its toolbar, editor and autosave. The parent keys it by path, so
 /// switching scripts unmounts this one (which flushes) and mounts a fresh one.
-export function ScriptView({ path, name, content, modified, wpm, onSaved, onError, onToggleSidebar, flushRef, editorRef }: Props) {
+export function ScriptView({
+  path,
+  name,
+  content,
+  modified,
+  wpm,
+  onSaved,
+  onError,
+  onToggleSidebar,
+  flushRef,
+  discardRef,
+  editorRef,
+}: Props) {
   const [readOnly, setReadOnly] = useState(false);
   const [popover, setPopover] = useState<PopoverState | null>(null);
   const container = useRef<HTMLDivElement | null>(null);
@@ -155,15 +169,17 @@ export function ScriptView({ path, name, content, modified, wpm, onSaved, onErro
 
   useEffect(() => {
     flushRef.current = () => autosave.flush();
+    discardRef.current = () => autosave.cancel();
     const onBlur = () => void autosave.flush();
     window.addEventListener('blur', onBlur);
     return () => {
       window.removeEventListener('blur', onBlur);
       flushRef.current = null;
+      discardRef.current = null;
       if (estimateTimer.current !== null) clearTimeout(estimateTimer.current);
       void autosave.flush();
     };
-  }, [autosave, flushRef]);
+  }, [autosave, flushRef, discardRef]);
 
   // A chip click bubbles up from the node view with its position and rectangle.
   useEffect(() => {

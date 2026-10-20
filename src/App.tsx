@@ -94,6 +94,7 @@ export function App() {
   const [file, setFile] = useState<{ path: string; data: FileData } | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const flushRef = useRef<(() => Promise<void>) | null>(null);
+  const discardRef = useRef<(() => void) | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const library = useVault();
   const { open, openPath, refresh, createScript, createFolder } = library;
@@ -159,7 +160,11 @@ export function App() {
       const incoming = event.payload;
       setShell((current) => mergeShell(current, shellOf(incoming), pendingPatch.current));
       if (incoming.scriptsFolder !== scriptsFolder.current) {
+        // The open script belongs to the old folder. Its edits were saved when this window
+        // lost focus to the Settings window; what is left must not land in the new folder.
         scriptsFolder.current = incoming.scriptsFolder;
+        discardRef.current?.();
+        open(null);
         void refresh();
       }
     }).then(keep);
@@ -167,7 +172,7 @@ export function App() {
       active = false;
       for (const stop of stops) stop();
     };
-  }, [refresh]);
+  }, [refresh, open]);
 
   const startSession = useCallback(() => {
     if (openPath === null) return;
@@ -333,9 +338,12 @@ export function App() {
           vault.reveal(path).catch(report);
           break;
         case 'trash':
-          done(vault.trash(path)).then(() => {
-            if (openPath !== null && (openPath === path || openPath.startsWith(`${path}/`))) open(null);
-          });
+          if (openPath !== null && (openPath === path || openPath.startsWith(`${path}/`))) {
+            // Nothing pending may be written back after the file is gone.
+            discardRef.current?.();
+            open(null);
+          }
+          done(vault.trash(path));
           break;
         default:
           break;
@@ -363,8 +371,11 @@ export function App() {
   function rename(row: Row, name: string | null) {
     setRenamingId(null);
     if (name === null || (row.kind !== 'script' && row.kind !== 'folder') || name.trim() === '' || name.trim() === row.name) return;
-    vault
-      .rename(row.path, name.trim())
+    // Pending edits go to the file under its old name first, so none can recreate it after.
+    const affectsOpen = openPath !== null && (openPath === row.path || openPath.startsWith(`${row.path}/`));
+    const flush = affectsOpen ? (flushRef.current?.() ?? Promise.resolve()) : Promise.resolve();
+    flush
+      .then(() => vault.rename(row.path, name.trim()))
       .then((renamed) => {
         if (row.kind === 'script') {
           if (openPath === row.path) openScript(renamed);
@@ -443,6 +454,7 @@ export function App() {
               onError={report}
               onToggleSidebar={toggleSidebar}
               flushRef={flushRef}
+              discardRef={discardRef}
               editorRef={editorRef}
             />
             <ControlBar

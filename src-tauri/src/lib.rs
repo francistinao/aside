@@ -330,8 +330,19 @@ fn vault_create_folder(vault: State<'_, Vault>, dir: String) -> error::Result<St
 }
 
 #[tauri::command]
-fn vault_rename(vault: State<'_, Vault>, path: String, new_name: String) -> error::Result<String> {
-    vault.rename(&path, &new_name)
+fn vault_rename(
+    vault: State<'_, Vault>,
+    settings: State<'_, SettingsState>,
+    path: String,
+    new_name: String,
+) -> error::Result<String> {
+    let renamed = vault.rename(&path, &new_name)?;
+    // Pins and recents keep pointing at the script, or at everything under the folder.
+    settings.modify(|s| {
+        vault::rename_paths(&mut s.pins, &path, &renamed);
+        vault::rename_paths(&mut s.recents, &path, &renamed);
+    })?;
+    Ok(renamed)
 }
 
 #[tauri::command]
