@@ -171,6 +171,15 @@ impl Settings {
         self.normalized()
     }
 
+    /// What the store holds, or the defaults when it is missing or unreadable. Unknown
+    /// fields are ignored, so a newer file still loads.
+    pub fn from_stored(value: Option<serde_json::Value>) -> Self {
+        value
+            .and_then(|value| serde_json::from_value::<Settings>(value).ok())
+            .unwrap_or_default()
+            .normalized()
+    }
+
     /// What the follow thread needs from the settings.
     pub fn follow_config(&self) -> FollowConfig {
         FollowConfig {
@@ -223,11 +232,7 @@ impl SettingsState {
     /// login comes from the OS, since the user can change it in System Settings too.
     pub fn load(app: &AppHandle) -> Result<Self> {
         let store = app.store(FILE)?;
-        let mut current = store
-            .get(KEY)
-            .and_then(|value| serde_json::from_value::<Settings>(value).ok())
-            .unwrap_or_default()
-            .normalized();
+        let mut current = Settings::from_stored(store.get(KEY));
         if let Ok(enabled) = app.autolaunch().is_enabled() {
             current.open_at_login = enabled;
         }
@@ -409,5 +414,14 @@ mod tests {
         let settings = settings.normalized();
         assert_eq!(settings.shortcuts.len(), 8);
         assert_eq!(settings.shortcuts[&crate::shortcuts::ShortcutAction::Stop], "Control+Alt+KeyS");
+    }
+
+    #[test]
+    fn a_missing_or_broken_store_falls_back_to_the_defaults() {
+        assert_eq!(Settings::from_stored(None), Settings::default());
+        assert_eq!(Settings::from_stored(Some(serde_json::json!("broken"))), Settings::default());
+        assert_eq!(Settings::from_stored(Some(serde_json::json!({"wpm": "fast"}))), Settings::default());
+        let newer = Settings::from_stored(Some(serde_json::json!({"wpm": 200, "mystery": true})));
+        assert_eq!(newer.wpm, 200);
     }
 }

@@ -292,4 +292,19 @@ mod tests {
         assert!(!AREA.contains(at(1440.0, 450.0)));
         assert!(!AREA.contains(at(-1.0, 450.0)));
     }
+
+    #[test]
+    fn a_zero_size_bubble_and_a_pointer_outside_every_area_stay_inside() {
+        let empty = PlaceParams {
+            bubble: Size { w: 0.0, h: 0.0 },
+            ..params()
+        };
+        let placed = place(at(700.0, 450.0), Corner::BottomRight, &empty, AREA, &mut FlipState::default());
+        assert!(AREA.contains(placed.target));
+        let outside = place(at(-500.0, -500.0), Corner::TopLeft, &params(), AREA, &mut FlipState::default());
+        assert_eq!(outside.target, at(8.0, 8.0));
+        assert_eq!(outside.corner, Corner::BottomRight);
+        let far = place(at(9000.0, 9000.0), Corner::BottomRight, &params(), AREA, &mut FlipState::default());
+        assert!(far.target.x + 380.0 <= AREA.right() - 8.0 && far.target.y + 140.0 <= AREA.bottom() - 8.0);
+    }
 }

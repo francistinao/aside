@@ -267,4 +267,16 @@ mod tests {
         assert_eq!(menu_accelerator("Control+Alt+Period"), "Ctrl+Alt+Period");
         assert_eq!(menu_accelerator("Shift+Digit8"), "Shift+8");
     }
+
+    #[test]
+    fn the_progress_line_keeps_counting_past_an_hour() {
+        let status = Status {
+            state: StateKind::Running,
+            title: "Long".into(),
+            elapsed: 3661.0,
+            total: 7200.0,
+            highlight: Highlight::Line,
+        };
+        assert_eq!(progress_line(&status), "61:01 of 120:00 · Line mode");
+    }
 }

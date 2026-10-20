@@ -872,4 +872,61 @@ mod tests {
         let delta = deadline.saturating_duration_since(clock.now()).as_secs_f64();
         assert!(delta <= 1.0 - 0.59 + 0.01, "delta {delta}");
     }
+
+    #[test]
+    fn controls_during_the_countdown_are_safe() {
+        let (clock, mut engine) = engine_with("One two three.", 150);
+        engine.start();
+        engine.previous();
+        engine.next();
+        engine.pause();
+        engine.resume();
+        assert_eq!(engine.snapshot().state, StateKind::Countdown);
+        engine.restart();
+        assert_eq!((engine.snapshot().state, engine.snapshot().count), (StateKind::Countdown, 3));
+        clock.advance(1.0);
+        engine.advance();
+        assert_eq!(engine.snapshot().count, 2);
+        engine.stop();
+        assert_eq!(engine.snapshot().state, StateKind::Idle);
+        assert!(engine.next_deadline().is_none());
+    }
+
+    #[test]
+    fn next_during_a_pause_marker_moves_to_the_next_line() {
+        let (clock, mut engine) = running("One. {pause 3s} Two.", 150);
+        engine.set_lines(vec![(0, 0), (1, 1)]);
+        clock.step_to(&engine);
+        engine.advance();
+        assert_eq!(engine.snapshot().pause, Some(3));
+        engine.next();
+        let s = engine.snapshot();
+        assert_eq!((s.state, s.word, s.pause, s.line), (StateKind::Running, Some(1), None, 1));
+    }
+
+    #[test]
+    fn restart_from_the_end_starts_the_countdown_again() {
+        let (clock, mut engine) = running("One.", 150);
+        clock.advance(10.0);
+        engine.advance();
+        assert_eq!(engine.snapshot().state, StateKind::Ended);
+        engine.restart();
+        assert_eq!((engine.snapshot().state, engine.snapshot().count), (StateKind::Countdown, 3));
+    }
+
+    #[test]
+    fn lines_set_after_the_end_and_extreme_speeds_never_panic() {
+        let (clock, mut engine) = running("One two.", 150);
+        clock.advance(10.0);
+        engine.advance();
+        engine.set_lines(vec![(0, 1), (5, 9)]);
+        assert_eq!(engine.snapshot().state, StateKind::Ended);
+        engine.set_wpm(0);
+        engine.advance();
+        engine.set_wpm(100_000);
+        engine.restart();
+        clock.advance(3.5);
+        engine.advance();
+        assert!(engine.snapshot().elapsed.is_finite());
+    }
 }

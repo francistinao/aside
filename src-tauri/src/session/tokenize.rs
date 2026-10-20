@@ -438,4 +438,98 @@ mod tests {
         let script = tokenize("one\ntwo  \nthree");
         assert_eq!(texts(&script.tokens), vec!["one", "two", "three", "<p>"]);
     }
+
+    fn word_texts(markdown: &str) -> Vec<String> {
+        tokenize(markdown)
+            .tokens
+            .into_iter()
+            .filter_map(|t| match t {
+                Token::Word { text, .. } => Some(text),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn emoji_and_numbers_are_words_with_their_own_letter_counts() {
+        let tokens = tokenize("Click 🚀 now 42 times.").tokens;
+        assert_eq!(
+            tokens,
+            vec![word("Click"), word("🚀"), word("now"), word("42"), word("times."), Token::ParagraphEnd]
+        );
+        let letters: Vec<u32> = tokens
+            .iter()
+            .filter_map(|t| match t {
+                Token::Word { letters, .. } => Some(*letters),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(letters, [5, 0, 3, 2, 5]);
+    }
+
+    #[test]
+    fn a_url_splits_into_words_but_loses_nothing() {
+        let words = word_texts("Open https://example.com/docs now");
+        assert_eq!(words.first().map(String::as_str), Some("Open"));
+        assert_eq!(words.last().map(String::as_str), Some("now"));
+        assert!(words.iter().all(|w| !w.is_empty()));
+        assert_eq!(words[1..words.len() - 1].concat(), "https://example.com/docs");
+    }
+
+    #[test]
+    fn crlf_line_endings_tokenize_like_lf() {
+        let crlf = "# Title\r\n\r\nFirst line.\r\nSecond line.\r\n\r\nNext paragraph.\r\n";
+        assert_eq!(tokenize(crlf).tokens, tokenize(&crlf.replace("\r\n", "\n")).tokens);
+    }
+
+    #[test]
+    fn tabs_and_runs_of_spaces_make_no_empty_words() {
+        assert_eq!(word_texts("One\t\ttwo   three "), ["One", "two", "three"]);
+    }
+
+    #[test]
+    fn a_pause_glued_to_words_still_counts() {
+        assert_eq!(
+            tokenize("Wait{pause 2s}here").tokens,
+            vec![word("Wait"), Token::Pause { seconds: 2.0 }, word("here"), Token::ParagraphEnd]
+        );
+    }
+
+    #[test]
+    fn two_pauses_in_a_row_both_count() {
+        let pauses = tokenize("A {pause 1s} {pause 2.5s} B")
+            .tokens
+            .iter()
+            .filter(|t| matches!(t, Token::Pause { .. }))
+            .count();
+        assert_eq!(pauses, 2);
+    }
+
+    #[test]
+    fn korean_mixed_with_latin_keeps_syllable_counts() {
+        let tokens = tokenize("안녕하세요 world 테스트입니다").tokens;
+        let letters: Vec<u32> = tokens
+            .iter()
+            .filter_map(|t| match t {
+                Token::Word { letters, .. } => Some(*letters),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(letters, [5, 5, 6]);
+    }
+
+    #[test]
+    fn a_very_long_word_keeps_its_letter_count() {
+        let long = "a".repeat(80);
+        let tokens = tokenize(&long).tokens;
+        assert!(matches!(&tokens[0], Token::Word { letters: 80, .. }));
+    }
+
+    #[test]
+    fn nested_lists_flatten_into_words_and_paragraph_ends() {
+        // A nested item belongs to its parent's block, so "a" and "b" read as one paragraph.
+        let tokens = tokenize("- a\n  - b\n- c").tokens;
+        assert_eq!(word_texts("- a\n  - b\n- c"), ["a", "b", "c"]);
+        assert_eq!(tokens.iter().filter(|t| matches!(t, Token::ParagraphEnd)).count(), 2);
+    }
 }

@@ -227,4 +227,19 @@ mod tests {
         assert!(snippet.contains("needle"));
         assert!(snippet.chars().count() <= SNIPPET_RADIUS * 2 + 6 + 2);
     }
+
+    #[test]
+    fn regex_characters_and_odd_queries_are_plain_text() {
+        let (_dir, index) = index_with(&[
+            ("Notes.md", "see item [b] and (c) or a*b"),
+            ("Plain.md", "nothing special"),
+        ]);
+        assert_eq!(index.search("[b]").len(), 1);
+        assert_eq!(index.search("(c)").len(), 1);
+        assert_eq!(index.search("a*b").len(), 1);
+        assert!(index.search("   ").is_empty());
+        assert!(index.search("").is_empty());
+        let long = "x".repeat(300);
+        assert!(index.search(&long).is_empty());
+    }
 }

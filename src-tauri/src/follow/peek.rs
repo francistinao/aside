@@ -199,4 +199,23 @@ mod tests {
         peek.set_hidden(false);
         assert_eq!(peek.step(now, &input(CONTROL, 0.0, true)), Visibility::Peeking);
     }
+
+    #[test]
+    fn a_key_already_held_on_the_first_frame_peeks_at_once() {
+        let mut peek = Peek::default();
+        assert_eq!(peek.step(Instant::now(), &input(CONTROL, 0.0, false)), Visibility::Peeking);
+    }
+
+    #[test]
+    fn pressing_again_within_the_grace_restarts_it_on_the_next_release() {
+        let start = Instant::now();
+        let mut peek = Peek::default();
+        peek.step(start, &input(CONTROL, 0.0, false));
+        peek.step(after(start, 100), &input(NONE, 0.0, false));
+        assert_eq!(peek.step(after(start, 900), &input(CONTROL, 0.0, false)), Visibility::Peeking);
+        let released = after(start, 1_000);
+        peek.step(released, &input(NONE, 0.0, false));
+        assert_eq!(peek.step(after(released, 1_100), &input(NONE, 0.0, false)), Visibility::Peeking);
+        assert_eq!(peek.step(after(released, 1_300), &input(NONE, 0.0, false)), Visibility::Visible);
+    }
 }

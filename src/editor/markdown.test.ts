@@ -34,6 +34,11 @@ describe('markdown round trip', () => {
     });
   }
 
+  it('CRLF line endings are not lossy', () => {
+    const original = '# Title\r\n\r\nFirst **bold** line.\r\n\r\n- one\r\n- two\r\n';
+    expect(fidelityOf(original, roundTrip(original))).toBe('exact');
+  });
+
   it('unsupported.md trips the fidelity guard', () => {
     const original = fixture('unsupported.md');
     expect(fidelityOf(original, roundTrip(original))).toBe('lossy');
