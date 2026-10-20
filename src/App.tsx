@@ -219,8 +219,8 @@ export function App() {
   }, [openPath, library.tree, report]);
   const shownFile = file !== null && file.path === openPath ? file.data : null;
 
-  const saved = useCallback((modified: number) => {
-    setFile((current) => (current === null ? current : { ...current, data: { ...current.data, modified } }));
+  const saved = useCallback((modified: number, content: string) => {
+    setFile((current) => (current === null ? current : { ...current, data: { content, modified } }));
   }, []);
 
   /// Opening from the sidebar selects the row and reveals its folders.

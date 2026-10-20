@@ -7,6 +7,7 @@ import type { MutableRefObject } from 'react';
 import { vault } from '../library/vault';
 import { createAutosave } from './autosave';
 import { editorExtensions } from './extensions';
+import { createVersionTracker } from './fileVersion';
 import { fidelityOf } from './markdown';
 import { formatEstimate } from './meta';
 import { PAUSE_CLICK_EVENT } from './pause';
@@ -27,10 +28,12 @@ interface Props {
   path: string;
   name: string;
   content: string;
-  /// The file's modification time. A change while the script is open means it was edited elsewhere.
+  /// The file's modification time. A time the editor has not produced itself means the
+  /// file was edited elsewhere.
   modified: number;
   wpm: number;
-  onSaved: (modified: number) => void;
+  /// The editor saved: the file's new time and the markdown it wrote.
+  onSaved: (modified: number, content: string) => void;
   onError: (reason: unknown) => void;
   onToggleSidebar: () => void;
   /// Set so the window can save before it closes or the app quits.
@@ -57,9 +60,19 @@ export function ScriptView({ path, name, content, modified, wpm, onSaved, onErro
   // Serialized once per document version, shared by the estimate and the save.
   const serialized = useRef<{ doc: ProseMirrorNode; markdown: string } | null>(null);
   const estimateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [version] = useState(() => createVersionTracker(modified));
   const autosave = useMemo(
-    () => createAutosave((markdown) => vault.write(path, markdown).then((data) => onSaved(data.modified)), onError),
-    [path, onSaved, onError],
+    () =>
+      createAutosave(
+        (markdown) =>
+          vault.write(path, markdown).then((data) => {
+            // Our own write: the new time is ours, not an edit from elsewhere.
+            version.markSaved(data.modified);
+            onSaved(data.modified, markdown);
+          }),
+        onError,
+      ),
+    [path, onSaved, onError, version],
   );
 
   const serialize = useCallback((current: Editor): string => {
@@ -118,17 +131,17 @@ export function ScriptView({ path, name, content, modified, wpm, onSaved, onErro
 
   // The file changed on disk. With no unsaved edits it reloads quietly; otherwise the user
   // chooses between their edits and the version on disk.
-  const seenModified = useRef(modified);
   useEffect(() => {
-    if (modified === seenModified.current) return;
-    seenModified.current = modified;
+    const change = version.onFileChanged(modified, autosave.pending());
+    if (change === 'none') return;
     const load = () => {
       autosave.cancel();
+      if (serialize(editor) === content) return;
       editor.commands.setContent(content, { contentType: 'markdown', emitUpdate: false });
       serialized.current = null;
       requestEstimate(editor);
     };
-    if (!autosave.pending()) {
+    if (change === 'reload') {
       load();
       return;
     }
@@ -138,7 +151,7 @@ export function ScriptView({ path, name, content, modified, wpm, onSaved, onErro
         else void autosave.flush();
       })
       .catch(onError);
-  }, [modified, content, name, autosave, editor, requestEstimate, onError]);
+  }, [modified, content, name, autosave, editor, requestEstimate, serialize, version, onError]);
 
   useEffect(() => {
     flushRef.current = () => autosave.flush();
