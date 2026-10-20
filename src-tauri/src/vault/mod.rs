@@ -386,7 +386,8 @@ impl Vault {
             format!("{}.{SCRIPT_EXT}", new_name.strip_suffix(".md").unwrap_or(new_name))
         };
         let target = path.with_file_name(&file_name);
-        if target.exists() && target != path {
+        // On a case-insensitive disk "test" and "Test" are the same file; that rename is fine.
+        if target.exists() && target != path && !same_file(&path, &target) {
             return Err(Error::NameTaken(new_name.to_string()));
         }
         fs::rename(&path, &target)?;
@@ -457,6 +458,25 @@ pub fn push_recent(list: &[String], path: &str) -> Vec<String> {
     out.extend(list.iter().filter(|p| p.as_str() != path).cloned());
     out.truncate(MAX_RECENTS);
     out
+}
+
+/// True when both paths name one file on disk, as a case-only rename does on macOS.
+fn same_file(a: &Path, b: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        match (fs::metadata(a), fs::metadata(b)) {
+            (Ok(x), Ok(y)) => x.dev() == y.dev() && x.ino() == y.ino(),
+            _ => false,
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        match (fs::canonicalize(a), fs::canonicalize(b)) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
 }
 
 /// Points every entry that named the renamed script or folder, or anything inside that
@@ -645,5 +665,45 @@ mod tests {
         assert!(recent.matches(&path, "hello"));
         assert!(!recent.matches(&path, "hello, edited elsewhere"));
         assert!(!recent.matches(Path::new("/tmp/other.md"), "hello"));
+    }
+
+    #[test]
+    fn korean_and_emoji_names_survive_create_rename_read_and_trash() {
+        let (dir, vault) = vault();
+        let created = vault.create("").expect("create");
+        let renamed = vault.rename(&created, "회의 🚀").expect("rename");
+        assert_eq!(renamed, "회의 🚀.md");
+        vault.write(&renamed, "안녕").expect("write");
+        assert_eq!(vault.read(&renamed).expect("read").content, "안녕");
+        assert!(dir.path().join("회의 🚀.md").exists());
+        let folder = vault.create_folder("").expect("folder");
+        let folder = vault.rename(&folder, "회의록").expect("rename folder");
+        let inside = vault.create(&folder).expect("create inside");
+        assert!(inside.starts_with("회의록/"));
+        vault.trash(&renamed).expect("trash");
+        assert!(!dir.path().join("회의 🚀.md").exists());
+    }
+
+    #[test]
+    fn renaming_only_the_case_of_a_name_works() {
+        let (dir, vault) = vault();
+        vault.write("test.md", "x").expect("write");
+        let renamed = vault.rename("test.md", "Test").expect("case-only rename");
+        assert_eq!(renamed, "Test.md");
+        let names: Vec<String> = fs::read_dir(dir.path())
+            .expect("dir")
+            .map(|e| e.expect("entry").file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names, ["Test.md"]);
+    }
+
+    #[test]
+    fn a_name_taken_by_another_file_is_refused_whatever_its_case() {
+        let (_dir, vault) = vault();
+        vault.write("Alpha.md", "a").expect("write");
+        vault.write("Beta.md", "b").expect("write");
+        let same_disk_rule = fs::metadata(_dir.path().join("alpha.md")).is_ok();
+        let result = vault.rename("Beta.md", if same_disk_rule { "alpha" } else { "Alpha" });
+        assert!(matches!(result, Err(Error::NameTaken(_))));
     }
 }
