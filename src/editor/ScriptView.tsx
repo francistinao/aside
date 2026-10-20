@@ -114,6 +114,9 @@ export function ScriptView({
 
   const editor = useEditor({
     extensions: editorExtensions(),
+    // The base rules ship in editor.module.css: an injected style tag is blocked by the
+    // production content security policy.
+    injectCSS: false,
     content,
     contentType: 'markdown',
     editorProps: { attributes: { class: styles.prose ?? '', spellcheck: 'true' } },
