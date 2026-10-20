@@ -126,8 +126,9 @@ fn begin_session(app: &AppHandle, payload: ScriptPayload) -> error::Result<()> {
     Ok(())
 }
 
-/// Hides the bubble, releases the shortcuts and ends the session. Main thread only.
-fn stop_session(app: &AppHandle) -> error::Result<()> {
+/// Hides the bubble, releases the shortcuts and ends the session. Main thread only. Also
+/// runs on its own two seconds after the script ends, so every step is safe to repeat.
+pub(crate) fn stop_session(app: &AppHandle) -> error::Result<()> {
     prompter::set_visible(app, false)?;
     shortcuts::unregister_all(app);
     #[cfg(target_os = "macos")]

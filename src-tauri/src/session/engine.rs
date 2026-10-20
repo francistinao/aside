@@ -97,8 +97,12 @@ enum State {
     Countdown { count: u8, deadline: Instant },
     Running { cursor: usize, started: Instant },
     Paused { cursor: usize, offset: f64 },
-    Ended,
+    /// The end cue shows until `until`, then the session goes idle on its own.
+    Ended { until: Instant },
 }
+
+/// How long "End of script" stays before the session ends like Stop.
+pub const END_HOLD: Duration = Duration::from_secs(2);
 
 pub struct Engine<C: Clock> {
     clock: C,
@@ -215,7 +219,7 @@ impl<C: Clock> Engine<C> {
 
     pub fn start(&mut self) {
         if self.tokens.is_empty() {
-            self.state = State::Ended;
+            self.end();
             return;
         }
         self.state = State::Countdown {
@@ -226,6 +230,12 @@ impl<C: Clock> Engine<C> {
 
     pub fn stop(&mut self) {
         self.state = State::Idle;
+    }
+
+    fn end(&mut self) {
+        self.state = State::Ended {
+            until: self.clock.now() + END_HOLD,
+        };
     }
 
     pub fn restart(&mut self) {
@@ -295,7 +305,7 @@ impl<C: Clock> Engine<C> {
         if (line as usize + 1) < self.line_count() {
             self.seek_line(line + 1);
         } else {
-            self.state = State::Ended;
+            self.end();
         }
     }
 
@@ -319,7 +329,7 @@ impl<C: Clock> Engine<C> {
                 }
                 State::Running { cursor, started } => {
                     let Some(&dur) = self.durations.get(cursor) else {
-                        self.state = State::Ended;
+                        self.end();
                         continue;
                     };
                     let ends = started + Duration::from_secs_f64(dur);
@@ -327,13 +337,17 @@ impl<C: Clock> Engine<C> {
                         return;
                     }
                     if cursor + 1 >= self.tokens.len() {
-                        self.state = State::Ended;
+                        self.end();
                         return;
                     }
                     self.state = State::Running {
                         cursor: cursor + 1,
                         started: ends,
                     };
+                }
+                State::Ended { until } if now >= until => {
+                    self.state = State::Idle;
+                    return;
                 }
                 _ => return,
             }
@@ -370,6 +384,7 @@ impl<C: Clock> Engine<C> {
                 }
                 Some(deadline)
             }
+            State::Ended { until } => Some(until),
             _ => None,
         }
     }
@@ -380,7 +395,7 @@ impl<C: Clock> Engine<C> {
             State::Countdown { count, .. } => (StateKind::Countdown, count),
             State::Running { .. } => (StateKind::Running, 0),
             State::Paused { .. } => (StateKind::Paused, 0),
-            State::Ended => (StateKind::Ended, 0),
+            State::Ended { .. } => (StateKind::Ended, 0),
         };
         let cursor = self.cursor();
         let word = cursor.and_then(|c| match self.tokens.get(c) {
@@ -389,7 +404,7 @@ impl<C: Clock> Engine<C> {
         });
         let line = cursor.map(|c| self.line_of(c)).unwrap_or(0);
         let section = match self.state {
-            State::Ended => self.headings_before.last().copied().unwrap_or(0),
+            State::Ended { .. } => self.headings_before.last().copied().unwrap_or(0),
             _ => cursor
                 .and_then(|c| self.headings_before.get(c).copied())
                 .unwrap_or(0),
@@ -420,7 +435,7 @@ impl<C: Clock> Engine<C> {
                 self.starts.get(cursor).copied().unwrap_or(0.0) + self.offset_in(cursor, started)
             }
             State::Paused { cursor, offset } => self.starts.get(cursor).copied().unwrap_or(0.0) + offset,
-            State::Ended => self.total,
+            State::Ended { .. } => self.total,
         }
     }
 
@@ -577,6 +592,37 @@ mod tests {
         assert!(close(duration(&Token::Pause { seconds: 2.0 }, 150), 2.0));
         assert!(close(duration(&Token::Pause { seconds: 2.0 }, 80), 2.0));
         assert!(close(duration(&word("hello", 5, Punctuation::None), 300), 0.2));
+    }
+
+    #[test]
+    fn the_end_cue_holds_two_seconds_then_the_session_is_idle() {
+        let (clock, mut engine) = running("One two three.", 150);
+        while engine.snapshot().state == StateKind::Running {
+            clock.step_to(&engine);
+            engine.advance();
+        }
+        assert_eq!(engine.snapshot().state, StateKind::Ended);
+        let hold = engine.next_deadline().expect("the hold's end");
+        assert!(close(hold.saturating_duration_since(clock.now()).as_secs_f64(), END_HOLD.as_secs_f64()));
+        clock.advance(1.0);
+        engine.advance();
+        assert_eq!(engine.snapshot().state, StateKind::Ended);
+        clock.advance(1.0);
+        engine.advance();
+        assert_eq!(engine.snapshot().state, StateKind::Idle);
+        assert!(engine.next_deadline().is_none());
+    }
+
+    #[test]
+    fn an_empty_script_ends_and_then_goes_idle() {
+        let clock = FakeClock::new();
+        let mut engine = Engine::new(clock.clone(), 150);
+        engine.load(Vec::new());
+        engine.start();
+        assert_eq!(engine.snapshot().state, StateKind::Ended);
+        clock.advance(END_HOLD.as_secs_f64());
+        engine.advance();
+        assert_eq!(engine.snapshot().state, StateKind::Idle);
     }
 
     #[test]
@@ -739,16 +785,19 @@ mod tests {
     }
 
     #[test]
-    fn end_state_sticks() {
+    fn end_state_holds_for_the_cue_then_goes_idle() {
         let (clock, mut engine) = running("One.", 150);
         clock.advance(10.0);
         engine.advance();
         let s = engine.snapshot();
         assert_eq!((s.state, s.word, s.pause), (StateKind::Ended, None, None));
         assert!(close(s.elapsed, s.total));
-        clock.advance(10.0);
+        clock.advance(1.0);
         engine.advance();
         assert_eq!(engine.snapshot(), s);
+        clock.advance(1.0);
+        engine.advance();
+        assert_eq!(engine.snapshot().state, StateKind::Idle);
         assert!(engine.next_deadline().is_none());
     }
 

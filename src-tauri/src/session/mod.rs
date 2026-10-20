@@ -179,6 +179,13 @@ fn run<C: Clock>(
         let snapshot = engine.snapshot();
         emit_changes(&app, mode, last, snapshot);
         publish(&app, &status, &script, mode, snapshot);
+        if last.is_some_and(|l| l.state == StateKind::Ended) && snapshot.state == StateKind::Idle {
+            // The end cue is over: end the session like Stop. Windows belong to the main thread.
+            let handle = app.clone();
+            let _ = app.run_on_main_thread(move || {
+                let _ = crate::stop_session(&handle);
+            });
+        }
         last = Some(snapshot);
     }
 }
