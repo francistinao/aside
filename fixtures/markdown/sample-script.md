@@ -19,3 +19,5 @@ Write your steps the way you would say them. For example:
 Open the Settings window. {pause 2s} Now click the Privacy tab on the right.
 
 When you are ready, open a new script and write your own.
+
+Aside is made by Francis Tin-ao.
