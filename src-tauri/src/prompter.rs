@@ -14,7 +14,7 @@ use crate::follow::{self, FollowConfig, FollowHandle, FollowStats};
 use crate::lock::lock;
 use crate::session::engine::StateKind;
 use crate::session::{Action, Control, SessionHandle};
-use crate::settings::SettingsState;
+use crate::settings::{self, SettingsState};
 
 pub const LABEL: &str = "prompter";
 pub const LIBRARY: &str = "library";
@@ -106,6 +106,21 @@ pub fn set_hidden(app: &AppHandle, hidden: bool) {
 pub fn toggle_hidden(app: &AppHandle) {
     let hidden = app.state::<Prompter>().is_hidden();
     set_hidden(app, !hidden);
+}
+
+/// The overlay registered its listeners and wants everything it may have missed: the
+/// capture status, the style, the script with its state and position, and the follow
+/// loop's corner and visibility. The first Start creates the window, so its first events
+/// go out before the page can hear them.
+pub fn ready(app: &AppHandle) -> Result<()> {
+    let state = app.state::<Prompter>();
+    app.emit_to(LABEL, CAPTURE_EVENT, state.capture_status())?;
+    settings::emit_style(app, &app.state::<SettingsState>().get())?;
+    app.state::<SessionHandle>().send(Control::Resend);
+    if let Some(follow) = lock(&state.follow).as_ref() {
+        follow.resend();
+    }
+    Ok(())
 }
 
 /// Turns capture exclusion on or off for an existing bubble and reports the result.

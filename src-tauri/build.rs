@@ -28,6 +28,7 @@ fn main() {
         "shortcuts_reset",
         "shortcuts_status",
         "prompter_resize",
+        "prompter_ready",
         "capture_status",
         "follow_stats",
     ]);

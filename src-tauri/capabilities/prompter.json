@@ -3,5 +3,5 @@
   "identifier": "prompter",
   "description": "The Prompter overlay. It listens for events and reports its visual lines.",
   "windows": ["prompter"],
-  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten", "allow-session-set-lines", "allow-prompter-resize"]
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten", "allow-session-set-lines", "allow-prompter-resize", "allow-prompter-ready"]
 }

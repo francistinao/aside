@@ -217,6 +217,12 @@ fn session_control(
     Ok(())
 }
 
+/// The overlay calls this once its listeners exist, so nothing sent earlier is lost.
+#[tauri::command]
+fn prompter_ready(app: AppHandle) -> error::Result<()> {
+    prompter::ready(&app)
+}
+
 #[tauri::command]
 fn shortcuts_set(app: AppHandle, action: ShortcutAction, accelerator: String) -> error::Result<Settings> {
     shortcuts::rebind(&app, action, &accelerator)
@@ -459,6 +465,7 @@ pub fn run() {
         shortcuts_reset,
         shortcuts_status,
         prompter_resize,
+        prompter_ready,
         capture_status,
         follow_stats
     ]);
@@ -491,6 +498,7 @@ pub fn run() {
         shortcuts_reset,
         shortcuts_status,
         prompter_resize,
+        prompter_ready,
         capture_status
     ]);
     builder
@@ -535,13 +543,6 @@ pub fn run() {
             {
                 println!("startup {} ms", start.elapsed().as_millis());
                 std::process::exit(0);
-            }
-            // The overlay may finish loading after the status, style and script were first sent.
-            if webview.label() == prompter::LABEL && matches!(payload.event(), PageLoadEvent::Finished) {
-                let status = webview.state::<prompter::Prompter>().capture_status();
-                let _ = webview.emit_to(prompter::LABEL, prompter::CAPTURE_EVENT, status);
-                let _ = settings::emit_style(webview.app_handle(), &webview.state::<SettingsState>().get());
-                webview.state::<SessionHandle>().send(Control::Resend);
             }
         })
         .build(tauri::generate_context!())

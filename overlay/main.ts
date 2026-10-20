@@ -12,10 +12,14 @@ const view = new View(root, {
   onResize: (width, height) => void invoke('prompter_resize', { width, height }),
 });
 
-void listen<ScriptPayload>('session://script', (event) => view.setScript(event.payload));
-void listen<Position>('session://position', (event) => view.setPosition(event.payload));
-void listen<StateEvent>('session://state', (event) => view.setState(event.payload));
-void listen<Style>('prompter://style', (event) => view.setStyle(event.payload));
-void listen<{ corner: Corner }>('prompter://corner', (event) => view.setCorner(event.payload.corner));
-void listen<{ state: Visibility }>('prompter://visibility', (event) => view.setVisibility(event.payload.state));
-void listen<CaptureStatus>('capture://status', (event) => view.setStatus(event.payload));
+// Events sent before these listeners exist are lost, and the first Start creates this
+// window, so once every listener is registered the overlay asks Rust to send everything.
+void Promise.all([
+  listen<ScriptPayload>('session://script', (event) => view.setScript(event.payload)),
+  listen<Position>('session://position', (event) => view.setPosition(event.payload)),
+  listen<StateEvent>('session://state', (event) => view.setState(event.payload)),
+  listen<Style>('prompter://style', (event) => view.setStyle(event.payload)),
+  listen<{ corner: Corner }>('prompter://corner', (event) => view.setCorner(event.payload.corner)),
+  listen<{ state: Visibility }>('prompter://visibility', (event) => view.setVisibility(event.payload.state)),
+  listen<CaptureStatus>('capture://status', (event) => view.setStatus(event.payload)),
+]).then(() => invoke('prompter_ready'));

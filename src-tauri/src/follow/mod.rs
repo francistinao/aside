@@ -138,6 +138,8 @@ struct Shared {
     fade: AtomicBool,
     /// The Show or Hide Prompter toggle.
     hidden: AtomicBool,
+    /// Set when the overlay asks for its state: the next frame emits corner and visibility.
+    resend: AtomicBool,
     /// The corner the user chose. The loop flips away from it at screen edges.
     corner: Mutex<Corner>,
     /// Logical window size, kept in step with the overlay's layout.
@@ -184,6 +186,11 @@ impl FollowHandle {
         self.shared.hidden.store(hidden, Ordering::SeqCst);
     }
 
+    /// Emits the current corner and visibility again on the next frame.
+    pub fn resend(&self) {
+        self.shared.resend.store(true, Ordering::SeqCst);
+    }
+
     pub fn set_corner(&self, corner: Corner) {
         *lock(&self.shared.corner) = corner;
     }
@@ -212,6 +219,7 @@ pub fn spawn(
         peek_key: Mutex::new(peek_key),
         fade: AtomicBool::new(fade),
         hidden: AtomicBool::new(false),
+        resend: AtomicBool::new(false),
         corner: Mutex::new(corner),
         bubble: Mutex::new(bubble),
     });
@@ -279,6 +287,10 @@ fn run(app: AppHandle, label: String, mut platform: Platform, shared: Arc<Shared
         let now = Instant::now();
         let dt = clamp_dt(now.duration_since(last_frame).as_secs_f64());
         last_frame = now;
+        if shared.resend.swap(false, Ordering::SeqCst) {
+            effective_corner = None;
+            last_visibility = None;
+        }
         let config = *lock(&shared.config);
         let active_period = Duration::from_secs_f64(1.0 / f64::from(config.active_hz));
         let idle_period = Duration::from_secs_f64(1.0 / f64::from(config.idle_hz));
