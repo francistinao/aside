@@ -65,6 +65,15 @@ export function formatShortcut(accelerator: string, mac: boolean): string {
   return [...modifiers.map((modifier) => WINDOWS_MODIFIERS[modifier] ?? modifier), keyLabel(key, false)].join('+');
 }
 
+/// The copy deck line for a refused combination.
+export const NOT_ALLOWED = "That shortcut can't be used. Add a modifier key and one other key.";
+
+/// A global shortcut needs Control or Option, or it would take Command keys from every app.
+export function isAllowed(accelerator: string): boolean {
+  const parts = accelerator.split('+');
+  return parts.includes('Control') || parts.includes('Alt');
+}
+
 export interface KeyPress {
   code: string;
   ctrlKey: boolean;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { acceleratorFromPress, formatShortcut } from './shortcuts';
+import { acceleratorFromPress, formatShortcut, isAllowed } from './shortcuts';
 
 describe('formatShortcut', () => {
   it('writes the macOS form with glyphs and a space before the key', () => {
@@ -35,5 +35,14 @@ describe('acceleratorFromPress', () => {
     expect(press('KeyR', { altKey: true, ctrlKey: true })).toBe('Control+Alt+KeyR');
     expect(press('Space', { ctrlKey: true, altKey: true })).toBe('Control+Alt+Space');
     expect(press('Digit8', { shiftKey: true, metaKey: true })).toBe('Shift+Super+Digit8');
+  });
+});
+
+describe('isAllowed', () => {
+  it('needs Control or Option in the combination', () => {
+    expect(isAllowed('Control+Alt+KeyR')).toBe(true);
+    expect(isAllowed('Alt+KeyR')).toBe(true);
+    expect(isAllowed('Super+KeyQ')).toBe(false);
+    expect(isAllowed('Shift+Digit8')).toBe(false);
   });
 });

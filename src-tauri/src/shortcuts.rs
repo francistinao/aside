@@ -7,7 +7,7 @@ use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 use crate::error::{Error, Result};
 use crate::lock::lock;
@@ -106,8 +106,14 @@ impl ShortcutsState {
     }
 }
 
+/// A shortcut needs Control or Option: a global Command-only key would take ⌘Q, ⌘C and
+/// their kin away from every app while a session runs.
 pub fn parse(accelerator: &str) -> Result<Shortcut> {
-    accelerator.parse::<Shortcut>().map_err(|_| Error::BadShortcut)
+    let shortcut = accelerator.parse::<Shortcut>().map_err(|_| Error::BadShortcut)?;
+    if !shortcut.mods.intersects(Modifiers::CONTROL | Modifiers::ALT) {
+        return Err(Error::BadShortcut);
+    }
+    Ok(shortcut)
 }
 
 /// The plugin flattens the OS error to a string. Windows says "already registered" for a
@@ -244,6 +250,16 @@ mod tests {
     fn a_bare_modifier_or_nonsense_is_a_bad_shortcut() {
         assert!(matches!(parse("Control"), Err(Error::BadShortcut)));
         assert!(matches!(parse("Ctrl+Alt+NoSuchKey"), Err(Error::BadShortcut)));
+    }
+
+    #[test]
+    fn a_shortcut_needs_control_or_option() {
+        assert!(matches!(parse("Super+KeyQ"), Err(Error::BadShortcut)));
+        assert!(matches!(parse("Shift+Super+KeyQ"), Err(Error::BadShortcut)));
+        assert!(matches!(parse("Shift+Digit8"), Err(Error::BadShortcut)));
+        assert!(parse("Control+KeyQ").is_ok());
+        assert!(parse("Alt+Shift+KeyQ").is_ok());
+        assert!(parse("Control+Alt+Super+KeyQ").is_ok());
     }
 
     #[test]
